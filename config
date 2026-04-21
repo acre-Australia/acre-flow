@@ -26,3 +26,4 @@ $customtitles               : true
 
 // $minifyjs                   : false
 // $minifyhtml                 : false
+jwt_secret                     : dev-secret-change-me

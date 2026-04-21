@@ -1,0 +1,271 @@
+<script total>
+
+	exports.id = 'acremqtt';
+	exports.name = 'Acre MQTT';
+	exports.icon = 'ti ti-exchange';
+	exports.group = 'Nexus';
+	exports.config = { host: 'yurir.org', port: 1883, secure: false };
+	exports.outputs = [
+		{ id: 'topics', name: 'All Topics' },
+		{ id: 'config', name: 'Config' },
+		{ id: 'status', name: 'Status'},
+		{ id: 'signal', name: 'Signal'},
+	];
+	exports.author = 'Acre Security';
+	exports.version = '3';
+	exports.npm = ['mqtt'];
+	exports.flags = ['acremqttbroker'];
+
+	exports.make = function(instance, config) {
+		var topics = new Map();
+		var configTopicPath = 'acre/config';
+		var statusTopicPath = 'acre/status';
+		var signalTopicPath = 'acre/signal';
+		var listeners = {};
+
+		const mqtt = require('mqtt');
+		var client;
+		const subscribtions = {};
+
+		const state = () => {
+			var obj;
+			if (!client) {
+				obj = { connected: false, connecting: false, disconnected: true, disconnnecting: false, status: 'disconnected' };
+			} else {
+				const { connected, disconnecting, reconnecting } = client;
+				obj = { connecting: client.stream ? client.stream.connecting : false, connected, disconnecting, reconnecting };
+				const current = Object.keys(obj).filter(s => obj[s]);
+				obj.status = current.length ? current[0] : 'disconnected';
+			}
+
+			instance.state = { status: obj.status, name: config.host + ':' + config.port };
+			instance.status(instance.state);
+			return obj;
+		};
+
+		instance.configure = function() {
+			disconnect(connect);
+			updateConnections();
+		};
+
+		instance.close = function() {
+			disconnect();
+		};
+
+		instance.configure();
+
+		function disconnect(callback) {
+			if (!client)
+				return callback && callback();
+
+			if (client.end)
+				client.end(true, cb);
+			else
+				cb();
+
+			function cb() {
+				client.removeAllListeners();
+				client = null;
+				callback && callback();
+			};
+		};
+
+		function connect() {
+
+			state();
+
+			var broker = config.secure ? 'mqtts://' : 'mqtt://' + config.host + ':' + config.port;
+			config.name = '[MQTT] ' + config.host + ':' + config.port;
+			var opt = CLONE(config);
+			delete opt.auth;
+			client = mqtt.connect(broker, opt);
+
+
+			console.log('[Broker] Connecting ...', opt);
+
+			client.on('connect', function() {
+				console.log('[Broker] Connnected');
+				state();
+				client.subscribe([configTopicPath + '/#', statusTopicPath + '/#', signalTopicPath + '/#'])
+			});
+
+			client.on('reconnect', function() {
+				console.log('[Broker] Reconnect');
+				state();
+			});
+
+			client.on('message', function(topic, message) {
+				let ts = new Date();
+				message = message.toString();
+				if (message[0] === '{' || message[0] === '[')
+					message = message.parseJSON(true);
+
+				sendTopic(topic, message, ts)
+
+				topics.set(topic, {
+					topic, message, ts
+				});
+			});
+
+			client.on('close', function(err) {
+				console.log('[Broker] Closed', err);
+				state();
+			});
+
+			client.on('error', function(err) {
+				console.log('[Broker] Error', err);
+				state();
+			});
+		};
+
+		function sendTopic(topic, message, ts) {
+			instance.send('topics', { topic, message, ts });
+			if (topic.startsWith(configTopicPath))
+				instance.send('config', { topic, message, ts });
+			if (topic.startsWith(statusTopicPath))
+				instance.send('status', { topic, message, ts });
+			if (topic.startsWith(signalTopicPath))
+				instance.send('signal', { topic, message, ts });
+		}
+
+		instance.refresh = function () {
+			updateConnections();
+		}
+
+		instance.call = function(data, callback) {
+			console.log('[Instance] Call');
+			if (data === 'resendTopics') {
+				instance.resendTopics();
+				callback && callback();
+			} else {
+				callback({ topic, config });
+			}
+		}
+
+		instance.resendTopics = function() {
+			console.log('[Broker] resendTopics');
+			topics.forEach((data) => {
+				sendTopic(data.topic, data.message, data.ts)
+			});
+		}
+
+		function updateConnections() {
+			var connections = instance.connections;
+			var newConnections = [];
+			var removedConnections = [];
+			var currentListeners = {};
+			Object.keys(connections).forEach(function(key) {
+				connections[key].forEach(function(x) {
+					var listenerIndex = key + '-' + x.id;
+					var listener = { instanceId: x.id, outputId: key, instanceInputId: x.index};
+					if (!listeners.hasOwnProperty(listenerIndex)) {
+						newConnections.push(listenerIndex);
+					}
+					currentListeners[listenerIndex] = listener;
+					listeners[listenerIndex] = listener;
+				});
+			});
+			Object.keys(listeners).forEach(function(key) {
+				if (!currentListeners.hasOwnProperty(key)) {
+					removedConnections.push(key);
+				}
+			});
+			console.log('### REFRESH:newConnections', newConnections);
+			console.log('### REFRESH:removedConnections', removedConnections);
+			listeners = structuredClone(currentListeners);
+		}
+	};
+
+</script>
+
+<readme>
+
+</readme>
+
+<style>
+	.CLASS footer { padding: 10px; font-size: 11px; }
+	.CLASS footer > ui-bind > div { height: 16px; }
+	.CLASS footer b { float: right; }
+</style>
+
+<settings>
+	<div class="padding">
+		<div class="row m">
+			<div class="col-md-4">
+				<ui-component name="input" path="?.host" config="placeholder:test.mosquitto.org;required:1">Hostname or IP address</ui-component>
+			</div>
+			<div class="col-md-4">
+				<ui-component name="input" path="?.port" config="type:number;placeholder:1883;required:1;format:">Port</ui-component>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-md-6">
+				<ui-component name="input" path="?.clientid">Client id</ui-component>
+				<div class="help m">Supports variables, example: \`client_{device-id}\`</div>
+				<ui-component name="checkbox" path="?.secure" class="m">Secure (ssl)</ui-component>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-md-6">
+				<ui-component name="checkbox" path="?.auth" class="m">Require Authorization</ui-component>
+			</div>
+		</div>
+		<ui-bind path="?.auth" config="show:value" class="row block">
+			<div class="col-md-6">
+				<ui-component name="input" path="?.username" class="m">Username</ui-component>
+			</div>
+			<div class="col-md-6">
+				<ui-component name="input" path="?.password" data-jc-config="type:password" class="m">Password</ui-component>
+			</div>
+		</ui-bind>
+		<div class="row">
+			<div class="col-md-6">
+				<ui-component name="checkbox" path="?.lwt" class="m">LWT</ui-component>
+			</div>
+		</div>
+		<ui-bind path="?.lwt" config="show:value" class="row block">
+			<div class="col-md-6">
+				<ui-component name="input" path="?.lwttopic">Last will topic</ui-component>
+				<div class="help m">Supports variables, example: \`lwt/{device-id}\`</div>
+			</div>
+			<div class="col-md-6">
+				<ui-component name="input" path="?.lwtmessage">Last will message</ui-component>
+				<div class="help m">Supports variables, example: \`{device-id} is offline\`</div>
+			</div>
+		</ui-bind>
+	</div>
+</settings>
+
+<body>
+	<header>
+		<i class="ICON"></i>NAME
+	</header>
+	<footer>
+		<ui-bind path="!STATUS" config="template;show" class="block m">
+			<script type="text/html">
+				<div><b>{{ value.name }}</b>Name</div>
+				<div><b>{{ value.status }}</b>Status</div>
+			</script>
+		</ui-bind>
+		<button type="button" class="button" onclick="EMIT('acremqtt_resend_data')">Resend Data</button>
+	</footer>
+</body>
+
+<script>
+
+
+
+
+	TOUCH(function(exports) {
+		var name = exports.name + ' --> ' + exports.id;
+
+		OFF('acremqtt_resend_data');
+		ON('acremqtt_resend_data', function() {
+			exports.call('resendTopics');
+		});
+
+		exports.settings = function(meta) {
+			console.log(name, 'settings', meta);
+		};
+	});
+</script>

@@ -1,0 +1,490 @@
+<script total>
+
+	exports.id = 'acretrigger';
+	exports.name = 'Trigger';
+	exports.icon = 'ti ti-code';
+	exports.author = 'Total.js';
+	exports.version = '1';
+	exports.group = 'Nexus';
+	exports.config = {
+		name: '',
+		operation: 'any', // all or any
+		conditions: [],
+	};
+	exports.inputs = [{ id: 'topics', name: 'topics' }];
+	exports.outputs = [{ id: 'output', name: 'Output' }];
+
+
+	exports.make = function(instance, config) {
+		var inputZones = [];
+		var areas = [];
+		var statusMap = new Map();
+
+		instance.message = function($) {
+			var data = $.data;
+			var topic = $.data.topic;
+			var payload = $.data.message;
+
+			if (!topic || !payload)
+				return;
+
+			var parts = topic.split('/');
+			var nexId = parts.pop();
+
+			if (topic.startsWith('acre/status/InputZone')) {
+				statusMap.set(nexId, payload);
+				var inputConfig = inputZones.find(i => i.id === nexId);
+				if (inputConfig)
+					inputConfig.status = payload;
+			} else if (topic.startsWith('acre/status/Area')) {
+				statusMap.set(nexId, payload);
+				var areaConfig = areas.find(i => i.id === nexId);
+				if (areaConfig)
+					areaConfig.status = payload;
+			} else if (topic.startsWith('acre/config/InputZone') && !inputZones.find(i => i.id === payload.NexId)) {
+				var status = statusMap.get(nexId)
+				inputZones.push({
+					id: payload.NexId,
+					name: payload.Name,
+					displayName: payload.Name + ' (' + payload.NexId + ')',
+					config: payload,
+					status,
+				});
+			}
+			else if (topic.startsWith('acre/config/Area') && !areas.find(i => i.id === payload.NexId)) {
+				var status = statusMap.get(nexId)
+				areas.push({
+					id: payload.NexId,
+					name: payload.Name,
+					displayName: payload.Name + ' (' + payload.NexId + ')',
+					config: payload,
+					status,
+				});
+			}
+			validateConditions();
+			instance.status({
+				name: config.name,
+				operation: config.operation,
+				conditions: config.conditions,
+			});
+		};
+
+		instance.configure = function() {
+			validateConditions();
+			instance.status({
+				name: config.name,
+				operation: config.operation,
+				conditions: config.conditions,
+			});
+		};
+
+		instance.close = function() {
+			// this instance is closed
+		};
+
+		instance.call = function (_, callback) {
+			callback({inputZones, areas});
+		};
+
+		instance.configure();
+
+		function validateConditions() {
+			var conditions = config.conditions || [];
+			var operation = config.operation || 'any';
+			var isMet = operation === 'all';
+
+			for (var condition of conditions) {
+				var conditionsMet = false;
+				if (condition.type === 'area') {
+					var area = areas.find(i => i.id === condition.area.id);
+					var valueChecker = condition.condition === 'Is' ? (a, b) => a === b : (a, b) => a !== b;
+					conditionsMet = !!(area && area.status && valueChecker(area.status.CurrentMode, condition.state));
+					condition.conditionsMet = conditionsMet;
+				} else if (condition.type === 'zone') {
+					var inputZone = inputZones.find(i => i.id === condition.inputzone.id);
+					var valueChecker = condition.condition === 'Is' ? (a, b) => a.includes(b) : (a, b) => !a.includes(b);
+					conditionsMet = !!(inputZone && (
+						(inputZone.status && valueChecker(inputZone.status.RawInputState, condition.state)) ||
+						(!inputZone.status && condition.condition === 'Is Not')
+					));
+					condition.conditionsMet = conditionsMet;
+				}
+				if (operation === 'all')
+					isMet = isMet && conditionsMet;
+				else
+					isMet = isMet || conditionsMet;
+			}
+			instance.send('output', { isMet, conditions });
+		}
+
+	};
+
+</script>
+
+<readme>
+Markdown readme
+
+```js
+var total = 'Hello world!';
+```
+</readme>
+
+<settings>
+	<div class="padding SETTINGS">
+		<div class="row m">
+			<div class="col-md-12">
+				<ui-component name="input" path="?.name" config="placeholder:Name;type:text">Name</ui-component>
+			</div>
+		</div>
+		<div class="row m">
+			<div class="col-md-12">
+				<ui-component name="input" path="?.operation" config="dirsource:%operations;dirraw:1;placeholder:Select Operation;required:1;" class="m"><b>Operation</b></ui-component>
+			</div>
+		</div>
+
+		<ui-bind path="%newForm" config="hide:!value" class="hidden new-condition-wrapper">
+			<div class="row">
+				<div class="col-md-12">
+					<ui-component name="input" path="%newForm.type" config="dirsource:%conditionTypes;dirraw:1;placeholder:Select Condition Type;required:1;" class="m"><b>Type</b></ui-component>
+				</div>
+			</div>
+			<ui-bind path="%newForm.type" config="hide:value!='zone'" class="hidden">
+				<div class="row">
+					<div class="col-md-4">
+						<ui-component name="input" path="%newForm.inputzone" config="dirsource:%inputzones;dirraw:1;placeholder:Select InputZone;required:1;dirkey:displayName" class="m"><b>InputZone</b></ui-component>
+					</div>
+					<div class="col-md-4">
+						<ui-component name="input" path="%newForm.condition" config="dirsource:%conditionsSelection;dirraw:1;placeholder:Select Condition;required:1;" class="m"><b>Condition</b></ui-component>
+					</div>
+					<div class="col-md-4">
+						<ui-component name="input" path="%newForm.state" config="dirsource:%inputStates;dirraw:1;placeholder:Select State;required:1;" class="m"><b>State</b></ui-component>
+					</div>
+				</div>
+			</ui-bind>
+			<ui-bind path="%newForm.type" config="hide:value!='area'" class="hidden">
+				<div class="row">
+					<div class="col-md-6">
+						<ui-component name="input" path="%newForm.area" config="dirsource:%areas;dirraw:1;placeholder:Select Area;required:1;dirkey:displayName" class="m"><b>Area</b></ui-component>
+					</div>
+					<div class="col-md-2">
+						<ui-component name="input" path="%newForm.condition" config="dirsource:%conditionsSelection;dirraw:1;placeholder:Select Condition;required:1;" class="m"><b>Condition</b></ui-component>
+					</div>
+					<div class="col-md-4">
+						<ui-component name="input" path="%newForm.state" config="dirsource:%areaStates;dirraw:1;placeholder:Select State;required:1;" class="m"><b>State</b></ui-component>
+					</div>
+				</div>
+			</ui-bind>
+			<ui-bind path="%newFormHasError" config="hide:!value" class="hidden">
+				<div class="row m">
+					<div class="col-sm-12 text-error">Please fill in all required fields.</div>
+				</div>
+			</ui-bind>
+			<div class="row m">
+				<div class="col-sm-6"></div>
+				<div class="col-sm-6 button-container">
+					<button type="button" class="button" onclick="EMIT('acretrigger_cancel_condition')">Cancel</button>
+					<button type="button" class="button button-primary" onclick="EMIT('acretrigger_add_condition')">Add</button>
+				</div>
+			</div>
+		</ui-bind>
+
+		<ui-bind path="%newForm" config="hide:!!value">
+			<div class="row m">
+				<div class="col-sm-6"></div>
+				<div class="col-sm-6 button-container">
+					<button type="button" class="button button-primary" onclick="EMIT('acretrigger_show_new_condition_form')">Add Condition</button>
+				</div>
+			</div>
+		</ui-bind>
+
+		<ui-bind path="%conditions" config="hide:!value.length" class="hidden">
+			<div class="row m">
+				<div class="col-lg-12">
+					<label class="m"><b>Conditions</b></label>
+				</div>
+			</div>
+			<div class="row m">
+				<div class="col-lg-12">
+					<ui-bind path="%conditions" config="template">
+						<script type="text/html">
+							{{ foreach m in value }}
+							<div class="row m">
+								<div class="col-md-2">
+									<span class="badge badge-gray">{{ m.type }}</span>
+								</div>
+								{{ if m.type == 'zone' }}
+									<div class="col-md-4">{{m.inputzone && m.inputzone.name}}</div>
+									<div class="col-md-2">{{m.condition}}</div>
+									<div class="col-md-2">{{m.state}}</div>
+								{{fi}}
+								{{ if m.type == 'area' }}
+									<div class="col-md-4">{{m.area && m.area.name}}</div>
+									<div class="col-md-2">{{m.condition}}</div>
+									<div class="col-md-2">{{m.state}}</div>
+								{{fi}}
+								<div class="col-md-1">
+									<button type="button" class="button button-danger" onclick="EMIT('acretrigger_remove_condition', {{ $index }})">
+										<i class="ti ti-trash nmr"></i>
+									</button>
+								</div>
+							</div>
+							{{ end }}
+						</script>
+					</ui-bind>
+				</div>
+			</div>
+		</ui-bind>
+	</div>
+</settings>
+
+<style>
+	.CLASS footer { padding: 10px; font-size: 12px; }
+	.CLASS footer .trigger-name {
+		font-weight: bold;
+		margin-bottom: 5px;
+	}
+	.CLASS footer .conditions {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 15px;
+		margin-bottom: 5px;
+	}
+	.CLASS footer .operation {
+		text-transform: uppercase;
+	}
+	.SETTINGS .button-container {
+		display: flex;
+		gap: 20px;
+	}
+	.SETTINGS .new-condition-wrapper {
+		padding: 20px;
+		background-color: #fdf9ff;
+		border: solid 1px #cccccc;
+		display: block;
+		margin-bottom: 20px;
+	}
+	.SETTINGS .button-primary {
+		background-color: var(--color);
+		color: #ffffff;
+	}
+	.SETTINGS .text-error {
+		color: #ff0000;
+	}
+</style>
+
+<script>
+
+	// Client-side script
+
+	var conditions = [];
+	var _settingsPath = null;
+
+	OFF('configure_trigger');
+	ON('configure_trigger', function(data) {
+		_settingsPath = data.path;
+	});
+
+	OFF('acretrigger_show_new_condition_form');
+	ON('acretrigger_show_new_condition_form', function() {
+		SET('%newForm', {});
+		SET('%newFormHasError', false);
+	});
+
+	OFF('acretrigger_cancel_condition');
+	ON('acretrigger_cancel_condition', function() {
+		SET('%newForm', null);
+	});
+
+	OFF('acretrigger_add_condition');
+	ON('acretrigger_add_condition', function() {
+		var formValue = GET('%newForm');
+		var newCondition = {
+			type: formValue.type,
+		}
+		var hasError = false;
+		if (formValue.type === 'zone') {
+			var inputzone = (GET('%inputzones') || []).find(i => i.id === formValue.inputzone);
+			if (inputzone) {
+				newCondition.inputzone = {
+					id: inputzone.id,
+					name: inputzone.name + '(' + inputzone.id + ')'
+				}
+			}
+			newCondition.state = formValue.state;
+			newCondition.condition = formValue.condition;
+			hasError = !inputzone || !newCondition.state || !newCondition.condition;
+		} else if (formValue.type === 'area') {
+			var area = (GET('%areas') || []).find(i => i.id === formValue.area);
+			if (area) {
+				newCondition.area = {
+					id: area.id,
+					name: area.name + '(' + area.id + ')'
+				}
+			}
+			newCondition.state = formValue.state;
+			newCondition.condition = formValue.condition;
+			hasError = !area || !newCondition.state || !newCondition.condition;
+		}
+
+		hasError = hasError || !formValue.type;
+
+		console.log('### hasError', hasError);
+		if (!hasError) {
+			conditions.push(newCondition);
+			SET('%conditions', conditions);
+			SET('%newForm', null);
+
+			if (_settingsPath)
+				CHANGE(_settingsPath);
+		}
+		SET('%newFormHasError', hasError);
+	});
+
+	OFF('acretrigger_remove_condition');
+	ON('acretrigger_remove_condition', function(index) {
+		conditions.splice(index, 1);
+		SET('%conditions', conditions);
+		if (_settingsPath)
+			CHANGE(_settingsPath);
+	});
+
+
+	TOUCH(function(exports, reinit) {
+
+		var name = exports.name + ' --> ' + exports.id;
+
+		var conditionTypes = [
+			{ id: 'zone', name: 'Zone'},
+			{ id: 'area', name: 'Area'}
+		];
+		var operations = [
+			{ id: 'all', name: 'All'},
+			{ id: 'any', name: 'Any'}
+		];
+		var conditionsSelection = ['Is', 'Is Not'];
+		var inputStates = ['Unknown','Sealed','Active','OpenCircuit','ShortCircuit','Masked','RangeReduction','Fault','Gross','Pulse','DCSubstitution','OutOfBounds','Unstable','Offline','Tamper','None'];
+		var areaStates = ['Armed', 'Disarmed'];
+		var mockInputs = [
+			{
+				id: '0ffffffe-001-00001',
+				name: 'Input Zone 1',
+				displayName: 'Input Zone 1 (0ffffffe-001-00001)',
+				config: {},
+			},
+			{
+				id: '0ffffffe-001-00002',
+				name: 'Input Zone 2',
+				displayName: 'Input Zone 2 (0ffffffe-001-00002)',
+				config: {},
+			}
+		];
+		var mockAreas = [
+			{
+				id: '0ffffffe-005-00001',
+				name: 'Area 1',
+				displayName: 'Area 1 (0ffffffe-005-00001)',
+				config: {},
+			},
+			{
+				id: '0ffffffe-005-00003',
+				name: 'Area 2',
+				displayName: 'Area 2 (0ffffffe-005-00002)',
+				config: {},
+			}
+		];
+
+		console.log(name, 'initialized' + (reinit ? ' : UPDATE' : ''));
+
+		exports.settings = function(meta) {
+			// Triggered when the user opens settings
+			console.log(name, 'settings', meta);
+			conditions = meta.config.conditions || [];
+
+			meta.call(function({ inputZones, areas }) {
+				SET('%inputzones', inputZones);
+				SET('%areas', areas);
+
+				console.log(name, 'settings:call', inputZones, areas);
+			});
+
+			SET('%conditionTypes', conditionTypes);
+			SET('%operations', operations);
+			SET('%conditionsSelection', conditionsSelection);
+			SET('%conditions', conditions);
+			SET('%inputStates', inputStates);
+			SET('%areaStates', areaStates);
+			SET('%newForm', null);
+			SET('%newFormHasError', false);
+		};
+
+		exports.configure = function(config, isinit) {
+			// Triggered when the config is changed
+			console.log(name, 'configure', config);
+		};
+
+		exports.status = function(status, isinit) {
+			// Triggered when the status is changed
+			console.log(name, 'status', status);
+		};
+
+		exports.note = function(note, isinit) {
+			// Triggered when the note is changed
+			console.log(name, 'note', note);
+		};
+
+		exports.variables = function(variables) {
+			// Triggered when the variables are changed
+			console.log(name, 'variables', variables);
+		};
+
+		exports.variables2 = function(variables) {
+			// Triggered when the variables2 are changed
+			console.log(name, 'variables2', variables);
+		};
+
+		exports.redraw = function() {
+			// Flow design has been redrawn
+			console.log(name, 'redraw');
+		};
+
+		exports.move = function() {
+			// Instance has changed position
+			console.log(name, 'move');
+		};
+
+		exports.close = function() {
+			// Triggered when the instance is closing due to some reasons
+			console.log(name, 'close');
+		};
+
+	});
+
+</script>
+
+<body>
+	<header>
+		<i class="$ICON"></i>$NAME
+	</header>
+	<footer>
+    <ui-bind path="!STATUS" config="template;show">
+			<script type="text/html">
+				<div class="trigger-name">
+					<span>{{value.name}}</span>
+				</div>
+				<div class="conditions">
+					<span>Conditions</span>
+					<span class='badge badge-gray badge-small operation'>{{value.operation}}</span>
+				</div>
+				<div class="row">
+					<div class="col-sm-12">
+					{{ foreach c in value.conditions }}
+						<span class="badge {{ c.conditionsMet ? 'badge-green' : 'badge-gray' }}">{{ c.type }}</span>
+					{{ end }}
+				</div>
+			</div>
+
+			</script>
+		</ui-bind>
+  </footer>
+</body>
