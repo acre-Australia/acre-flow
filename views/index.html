@@ -47,6 +47,7 @@
 
 	<ui-component name="importer" path="common.form" config="if:importform;url:@{#}/forms/import.html"></ui-component>
 
+	@{if user.isAdmin}
 	<header>
 
 		<ui-bind path="common.env" config="template" title="@(Environment)" class="env">
@@ -75,7 +76,9 @@
 			<ui-component name="virtualwire" path="common.page" class="toolbar"></ui-component>
 		</div>
 	</header>
+	@{fi}
 
+	@{if user.isAdmin}
 	<div class="appmenu">
 		<ui-component name="noscrollbar" config="parent:window;margin:60" class="invisible">
 			<ui-component name="selected" path="common.page" config="selector:.exec;attr:id">
@@ -93,8 +96,9 @@
 			</ui-component>
 		</ui-component>
 	</div>
+	@{fi}
 
-	<div class="appmain">
+	<div class="appmain@{if user.isAdmin} is-admin@{fi}">
 
 		<ui-component name="ready" config="rclass:invisible" class="invisible">
 

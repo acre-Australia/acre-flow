@@ -16,7 +16,11 @@ AUTH(function($) {
 	if (token) {
 		var session = DECRYPTREQ($, token, CONF.cookie_secret);
 		if (session && session.id === PREF.user.id && session.expire > NOW) {
-			$.success({ sa: true });
+			var user = {};
+			user.sa = true;
+			user.permissions = session.permissions instanceof Array ? session.permissions : [];
+			user.isAdmin = session.isAdmin == null ? false : session.isAdmin === true;
+			$.success(user);
 			return;
 		} else
 			BLACKLIST[$.ip] = (BLACKLIST[$.ip] || 0) + 1;

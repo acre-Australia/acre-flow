@@ -81,6 +81,8 @@ function sso($) {
 	var session = {};
 	session.id = PREF.user.id;
 	session.expire = NOW.add('1 month');
+	session.isAdmin = payload.isAdmin === true;
+	session.permissions = payload.permissions instanceof Array ? payload.permissions : [];
 	$.cookie(CONF.cookie, ENCRYPTREQ($, session, CONF.cookie_secret), '1 month');
 
 	var redirect = $.query.redirect || '/';
