@@ -3,6 +3,7 @@ exports.install = function() {
 	ROUTE('+GET /designer/');
 	ROUTE('+GET /open/{reference}/', openflow);
 	ROUTE('GET /sso/', sso);
+	ROUTE('POST /sso/', sso);
 	ROUTE('-GET /', login);
 };
 
@@ -39,7 +40,19 @@ function index($) {
 }
 
 function sso($) {
-	var token = $.query.token;
+	// Accept token from: Authorization header > POST body > query string
+	var token = null;
+
+	var authHeader = $.headers['authorization'] || $.headers['Authorization'];
+	if (authHeader && authHeader.substring(0, 7).toLowerCase() === 'bearer ')
+		token = authHeader.substring(7).trim();
+
+	if (!token && $.body && $.body.token)
+		token = $.body.token;
+
+	if (!token && $.query.token)
+		token = $.query.token;
+
 	if (!token) {
 		$.invalid(401);
 		return;
@@ -81,11 +94,16 @@ function sso($) {
 	var session = {};
 	session.id = PREF.user.id;
 	session.expire = NOW.add('1 month');
-	session.isAdmin = payload.isAdmin === true;
+	session.isFullEngineer = payload.roles && payload.roles.includes('FullEngineer');
 	session.permissions = payload.permissions instanceof Array ? payload.permissions : [];
 	$.cookie(CONF.cookie, ENCRYPTREQ($, session, CONF.cookie_secret), '1 month');
 
 	var redirect = $.query.redirect || '/';
+
+	// Allow redirect from POST body too
+	if ($.body && $.body.redirect)
+		redirect = $.body.redirect;
+
 	// Only allow relative redirects to prevent open redirect attacks
 	if (redirect[0] !== '/')
 		redirect = '/';

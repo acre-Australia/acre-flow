@@ -97,5 +97,30 @@
 
 	</script>
 
+	<script>
+		// If running inside a same-origin iframe/shell app, try to auto-login
+		// using the accessToken already stored in localStorage by the parent app.
+		(function() {
+			try {
+				var token = localStorage.getItem('accessToken');
+				if (!token)
+					return;
+
+				fetch('/sso/', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': 'Bearer ' + token
+					},
+					credentials: 'include',
+					body: JSON.stringify({ redirect: '/' })
+				}).then(function(res) {
+					if (res.ok)
+						location.href = '/';
+				});
+			} catch (e) {}
+		})();
+	</script>
+
 </body>
 </html>

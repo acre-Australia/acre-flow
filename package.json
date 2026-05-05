@@ -7,6 +7,7 @@
     "url": "https://github.com/totaljs/flow"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "mqtt": "^5.15.1",
     "total5": "latest"
   },
