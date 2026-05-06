@@ -7,6 +7,33 @@ exports.install = function() {
 	ROUTE('-GET /', login);
 };
 
+function appbasepath() {
+	var base = CONF.$root || '';
+
+	if (!base || base === '/')
+		return '';
+
+	if (base[0] !== '/')
+		base = '/' + base;
+
+	if (base[base.length - 1] === '/')
+		base = base.substring(0, base.length - 1);
+
+	return base;
+}
+
+function appurl(path) {
+	var base = appbasepath();
+
+	if (!path || path === '/')
+		return base || '/';
+
+	if (path[0] !== '/')
+		path = '/' + path;
+
+	return (base + path).replace(/\/+/g, '/');
+}
+
 function index($) {
 
 	if ($.user.openplatform && !$.user.iframe && $.query.openplatform) {
@@ -98,7 +125,7 @@ function sso($) {
 	session.permissions = payload.permissions instanceof Array ? payload.permissions : [];
 	$.cookie(CONF.cookie, ENCRYPTREQ($, session, CONF.cookie_secret), '1 month');
 
-	var redirect = $.query.redirect || '/';
+	var redirect = $.query.redirect || appurl('/');
 
 	// Allow redirect from POST body too
 	if ($.body && $.body.redirect)
@@ -106,7 +133,11 @@ function sso($) {
 
 	// Only allow relative redirects to prevent open redirect attacks
 	if (redirect[0] !== '/')
-		redirect = '/';
+		redirect = appurl('/');
+
+	var base = appbasepath();
+	if (base && redirect.substring(0, base.length) !== base)
+		redirect = appurl(redirect);
 
 	$.redirect(redirect);
 }
@@ -116,7 +147,7 @@ function openflow($) {
 	var db = Flow.db;
 	for (var key in db) {
 		if (key !== 'variables' && db[key].reference === ref) {
-			$.redirect('/#' + db[key].id);
+			$.redirect(appurl('/#' + db[key].id));
 			return;
 		}
 	}

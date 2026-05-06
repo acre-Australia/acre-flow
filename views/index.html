@@ -652,7 +652,7 @@
 						EXEC('-approve/show', '<i class="ti ti-warning red"></i><b>@(WARNING):</b> @(Are you sure you want to update bundle of the Total.js Flow? It is a hazardous step.)', '"ti ti-sync" @(Upload bundle)', function() {
 							var opt = {};
 							opt.multiple = false;
-							opt.url = '/fapi/update/' + model.openplatform;
+							opt.url = '@{#}/fapi/update/' + model.openplatform;
 							opt.callback = function(response, err) {
 								if (err) {
 									EXEC('-message/warning', err);

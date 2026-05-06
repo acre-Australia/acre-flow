@@ -106,17 +106,17 @@
 				if (!token)
 					return;
 
-				fetch('/sso/', {
+				fetch('@{#}/sso/', {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
 						'Authorization': 'Bearer ' + token
 					},
 					credentials: 'include',
-					body: JSON.stringify({ redirect: '/' })
+					body: JSON.stringify({ redirect: '@{#}/' })
 				}).then(function(res) {
 					if (res.ok)
-						location.href = '/';
+						location.href = '@{#}/open/acre-flow';
 				});
 			} catch (e) {}
 		})();
