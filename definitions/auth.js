@@ -19,7 +19,6 @@ AUTH(function($) {
 			var user = {};
 			user.sa = true;
 			user.permissions = session.permissions instanceof Array ? session.permissions : [];
-			user.isAdmin = session.isAdmin == null ? false : session.isAdmin === true;
 			$.success(user);
 			return;
 		} else
