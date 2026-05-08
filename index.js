@@ -3,9 +3,28 @@
 // https://www.totaljs.com
 // ===================================================
 
+require('dotenv').config();
 require('total5');
 
 const options = {};
+
+// Allow CI/CD to inject sensitive values without committing secrets.
+const secureConfig = {};
+
+if (process.env.JWT_SECRET)
+	secureConfig.jwt_secret = process.env.JWT_SECRET;
+
+if (process.env.COOKIE_SECRET)
+	secureConfig.cookie_secret = process.env.COOKIE_SECRET;
+
+if (process.env.COOKIE_NAME)
+	secureConfig.cookie = process.env.COOKIE_NAME;
+
+if (process.env.COMPONENTS)
+	secureConfig.components = process.env.COMPONENTS;
+
+if (Object.keys(secureConfig).length)
+	options.config = secureConfig;
 
 // options.ip = '127.0.0.1';
 // options.port = parseInt(process.argv[2]);

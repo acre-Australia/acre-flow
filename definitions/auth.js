@@ -1,7 +1,30 @@
 var BLACKLIST = {};
 
 AUTH(function($) {
-	$.success({ sa: true });
+	// Setup interface
+	if (CONF.op_reqtoken && CONF.op_restoken) {
+		OpenPlatform.auth($);
+		return;
+	}
+
+	if (BLACKLIST[$.ip] > 15) {
+		$.invalid();
+		return;
+	}
+
+	var token = $.cookie(CONF.cookie);
+	if (token) {
+		var session = DECRYPTREQ($, token, CONF.cookie_secret);
+		if (session && session.id === PREF.user.id && session.expire > NOW) {
+			var user = {};
+			user.sa = true;
+			user.permissions = session.permissions instanceof Array ? session.permissions : [];
+			$.success(user);
+			return;
+		} else
+			BLACKLIST[$.ip] = (BLACKLIST[$.ip] || 0) + 1;
+	}
+	$.invalid();
 });
 
 ON('init', function() {
