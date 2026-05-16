@@ -85,6 +85,9 @@
 		common.logs = {};
 		common.logs.errors = { icon: 'ti ti-bug', name: '@(Errors)', encode: false, items: [] };
 		common.page = common.socket ? 'flow' : '';
+		common.user = {
+			isFullEngineer: false
+		};
 
 		@{if user.color}APPEARANCE({ color: '@{user.color}' });@{fi}
 

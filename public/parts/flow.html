@@ -1,3 +1,69 @@
+<style>
+/* ===== Expand / Collapse Feature ===== */
+
+/* Header slide up */
+.flow .header {
+	transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+}
+.flow .header-empty {
+	transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	overflow: hidden;
+}
+.flow-fullscreen .header {
+	transform: translateY(-100%);
+	opacity: 0;
+	pointer-events: none;
+}
+.flow-fullscreen .header-empty {
+	height: 0 !important;
+}
+
+/* Sidebar fade during collapse/expand */
+.flow section[data-type="left"] {
+	transition: opacity 0.25s ease;
+}
+.flow-fullscreen section[data-type="left"] {
+	opacity: 0;
+	pointer-events: none;
+}
+
+/* Floating expand button */
+#flow-floating-btn {
+	position: fixed;
+	top: 12px;
+	left: 12px;
+	z-index: 9999;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+	visibility: hidden;
+	opacity: 0;
+	transform: scale(0.7);
+	transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0.3s;
+	border: none;
+	font-size: 15px;
+	padding: 0;
+}
+.flow-fullscreen #flow-floating-btn {
+	visibility: visible;
+	opacity: 1;
+	transform: scale(1);
+	transition: opacity 0.3s ease 0.15s, transform 0.3s ease 0.15s, visibility 0s linear 0s;
+}
+/* Layout container: offset by header height so it fills exactly to bottom */
+.flow .ui-layout {
+	top: 50px !important;
+}
+.flow-fullscreen .ui-layout {
+	top: 0 !important;
+}
+</style>
+
 <ui-plugin name="flow" class="flow">
 
 	<header class="header">
@@ -37,6 +103,7 @@
 
 		<div>
 			<button title="@(Options)" class="exec" data-exec="?/options"><i class="ti ti-cog"></i></button>
+			<button title="@(Collapse)" class="exec" data-exec="?/togglefullscreen" id="flow-collapse-btn"><i class="ti ti-fullscreen"></i></button>
 		</div>
 
 		<div style="border-right:0;margin-top:4px">
@@ -48,9 +115,10 @@
 			</ui-bind>
 		</div>
 	</header>
+	<button id="flow-floating-btn" class="exec" data-exec="?/togglefullscreen" title="@(Expand)"><i class="ti ti-compress"></i></button>
 	<div class="header-empty"></div>
 
-	<ui-component name="layout" path="?.layout" config="margin:50">
+	<ui-component name="layout" path="?.layout" config="margin:50;$id:flowlayout">
 
 		<script type="text/plain">
 			{
@@ -1620,6 +1688,41 @@
 			TOGGLE('common.console');
 		};
 
+		var LS_KEY = 'flow_layout_collapsed';
+
+		var applyCollapsed = function(collapse, animate) {
+			var pluginEl = $('ui-plugin[name="flow"]');
+			FIND('#flowlayout', function(layout) {
+				if (collapse) {
+					if (animate) pluginEl.aclass('flow-fullscreen');
+					setTimeout(function() {
+						layout.config.margin = 0;
+						layout.reset();
+						// reset() re-applies original settings (show:true), so re-hide after
+						layout.update('left', { show: false });
+						layout.update('bottom', { show: false });
+						if (!animate) pluginEl.aclass('flow-fullscreen');
+						setTimeout(function() { EMIT('resize'); }, 50);
+					}, animate ? 260 : 0);
+				} else {
+					layout.config.margin = 50;
+					layout.update('left', { size: 200, minsize: 150, resize: true, show: true });
+					layout.update('bottom', { show: true, size: 30 });
+					layout.reset();
+					setTimeout(function() { pluginEl.rclass('flow-fullscreen'); }, 10);
+					setTimeout(function() { EMIT('resize'); }, 310);
+				}
+			});
+		};
+
+		exports.togglefullscreen = function() {
+			var pluginEl = $('ui-plugin[name="flow"]');
+			var isCollapsed = pluginEl.hclass('flow-fullscreen');
+			var next = !isCollapsed;
+			localStorage.setItem(LS_KEY, next ? '1' : '0');
+			applyCollapsed(next, true);
+		};
+
 		ON('online', function(is) {
 			if (is)
 				SETTER('loading/hide', 1000);
@@ -2076,6 +2179,10 @@
 		});
 
 		exports.init();
+
+		// Restore collapse state (default: expanded)
+		if (localStorage.getItem(LS_KEY) === '1')
+			applyCollapsed(true, false);
 	});
 
 	function htmldecode(text) {

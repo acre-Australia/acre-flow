@@ -103,7 +103,7 @@
 		<ui-component name="ready" config="rclass:invisible" class="invisible">
 
 			<div class="landing">
-				<ui-component name="parts" path="common.tabs" config="parent:window;margin:60;focus:common/selected"></ui-component>
+				<ui-component name="parts" path="common.tabs" config="parent:window;margin:@{user.isFullEngineer ? 60 : 0};focus:common/selected"></ui-component>
 			</div>
 
 			<ui-component name="importer" path="common.form" config="if:streamform;url:@{#}/forms/stream.html"></ui-component>
