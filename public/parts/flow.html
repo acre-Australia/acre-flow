@@ -1694,6 +1694,13 @@
 			var pluginEl = $('ui-plugin[name="flow"]');
 			FIND('#flowlayout', function(layout) {
 				if (collapse) {
+					layout.config.margin = 50;
+					layout.update('left', { size: 200, minsize: 150, resize: true, show: true });
+					layout.update('bottom', { show: true, size: 30 });
+					layout.reset();
+					setTimeout(function() { pluginEl.rclass('flow-fullscreen'); }, 10);
+					setTimeout(function() { EMIT('resize'); }, 310);
+				} else {
 					if (animate) pluginEl.aclass('flow-fullscreen');
 					setTimeout(function() {
 						layout.config.margin = 0;
@@ -1704,20 +1711,16 @@
 						if (!animate) pluginEl.aclass('flow-fullscreen');
 						setTimeout(function() { EMIT('resize'); }, 50);
 					}, animate ? 260 : 0);
-				} else {
-					layout.config.margin = 50;
-					layout.update('left', { size: 200, minsize: 150, resize: true, show: true });
-					layout.update('bottom', { show: true, size: 30 });
-					layout.reset();
-					setTimeout(function() { pluginEl.rclass('flow-fullscreen'); }, 10);
-					setTimeout(function() { EMIT('resize'); }, 310);
 				}
+
+				// Emit iframe event for toggle fullscreen mode
+				W.parent && W.parent.postMessage(STRINGIFY({ TYPE: 'flowfullscreen', SOURCE: 'flow', collapse: collapse }), '*');
 			});
 		};
 
 		exports.togglefullscreen = function() {
 			var pluginEl = $('ui-plugin[name="flow"]');
-			var isCollapsed = pluginEl.hclass('flow-fullscreen');
+			var isCollapsed = !pluginEl.hclass('flow-fullscreen');
 			var next = !isCollapsed;
 			localStorage.setItem(LS_KEY, next ? '1' : '0');
 			applyCollapsed(next, true);

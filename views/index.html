@@ -47,63 +47,63 @@
 
 	<ui-component name="importer" path="common.form" config="if:importform;url:@{#}/forms/import.html"></ui-component>
 
-	@{if user.isFullEngineer}
-	<header>
+	<ui-bind path="common.flowfullscreen" config="hide:value" class="hidden">	
+		<header>
+			<ui-bind path="common.env" config="template" title="@(Environment)" class="env">
+				<script type="text/html">
+					<span class="badge badge-medium badge-{{ if value === 'dev' }}red{{ else if value === 'test' }}orange{{ else }}green{{ fi }}">{{ value }}</span>
+				</script>
+			</ui-bind>
 
-		<ui-bind path="common.env" config="template" title="@(Environment)" class="env">
-			<script type="text/html">
-				<span class="badge badge-medium badge-{{ if value === 'dev' }}red{{ else if value === 'test' }}orange{{ else }}green{{ fi }}">{{ value }}</span>
-			</script>
-		</ui-bind>
+			<span class="search exec pull-right" data-exec="common/search" title="@(Search) (F1)"><i class="ti ti-search"></i></span>
+			<span class="console exec pull-right" data-exec="common/console" title="@(Server log)"><i class="ti ti-bug"></i></span>
 
-		<span class="search exec pull-right" data-exec="common/search" title="@(Search) (F1)"><i class="ti ti-search"></i></span>
-		<span class="console exec pull-right" data-exec="common/console" title="@(Server log)"><i class="ti ti-bug"></i></span>
+			@{if user.openplatform && !user.iframe}
+			<span class="mainmenu"><a href="@{user.openplatform}"><i class="ti ti-menu"></i></a></span>
+			@{else}
+			<span class="mainmenu exec" data-exec="common/focus" data-id="main"><i class="ti ti-menu"></i></span>
+			@{fi}
 
-		@{if user.openplatform && !user.iframe}
-		<span class="mainmenu"><a href="@{user.openplatform}"><i class="ti ti-menu"></i></a></span>
-		@{else}
-		<span class="mainmenu exec" data-exec="common/focus" data-id="main"><i class="ti ti-menu"></i></span>
-		@{fi}
+			<ui-bind path="common.tabs" config="template:div" class="tabs block">
+				<script type="text/html">
+					{{ foreach m in value }}
+						{{ if !m.noclose }}<div class="exec{{ if m.focused }} selected{{ fi }}" data-exec="common/focus" data-id="{{ m.id }}">{{ if !m.noclose }}<i class="ti ti-times exec" data-exec="common/close"></i>{{ fi }}{{ m.name }}</div>{{ fi }}
+					{{ end }}
+				</script>
+			</ui-bind>
+			<div class="pull-right">
+				<ui-component name="virtualwire" path="common.page" class="toolbar"></ui-component>
+			</div>
+		</header>
+	</ui-bind>
 
-		<ui-bind path="common.tabs" config="template:div" class="tabs block">
-			<script type="text/html">
-				{{ foreach m in value }}
-					{{ if !m.noclose }}<div class="exec{{ if m.focused }} selected{{ fi }}" data-exec="common/focus" data-id="{{ m.id }}">{{ if !m.noclose }}<i class="ti ti-times exec" data-exec="common/close"></i>{{ fi }}{{ m.name }}</div>{{ fi }}
-				{{ end }}
-			</script>
-		</ui-bind>
-		<div class="pull-right">
-			<ui-component name="virtualwire" path="common.page" class="toolbar"></ui-component>
-		</div>
-	</header>
-	@{fi}
-
-	@{if user.isFullEngineer}
-	<div class="appmenu">
-		<ui-component name="noscrollbar" config="parent:window;margin:60" class="invisible">
-			<ui-component name="selected" path="common.page" config="selector:.exec;attr:id">
-				<ui-bind path="common.menu" config="template" class="block">
-					<script type="text/html">
-						{{ foreach m in value }}
-							{{ if m === '-' }}
-							<hr />
-							{{ else if m.hidden !== true }}
-							<div class="exec" data-exec="common/menu" title="{{ m.name }}" data-id="{{ m.id }}"><i class="{{ m.icon }}"></i></div>
-							{{ fi }}
-						{{ end }}
-					</script>
-				</ui-bind>
+	<ui-bind path="common.flowfullscreen" config="hide:value" class="hidden">	
+		<div class="appmenu">
+			<ui-component name="noscrollbar" config="parent:window;margin:60" class="invisible">
+				<ui-component name="selected" path="common.page" config="selector:.exec;attr:id">
+					<ui-bind path="common.menu" config="template" class="block">
+						<script type="text/html">
+							{{ foreach m in value }}
+								{{ if m === '-' }}
+								<hr />
+								{{ else if m.hidden !== true }}
+								<div class="exec" data-exec="common/menu" title="{{ m.name }}" data-id="{{ m.id }}"><i class="{{ m.icon }}"></i></div>
+								{{ fi }}
+							{{ end }}
+						</script>
+					</ui-bind>
+				</ui-component>
 			</ui-component>
-		</ui-component>
-	</div>
-	@{fi}
+		</div>
+	</ui-bind>
+
 
 	<div class="appmain@{if user.isFullEngineer} is-full-engineer@{fi}">
 
 		<ui-component name="ready" config="rclass:invisible" class="invisible">
 
 			<div class="landing">
-				<ui-component name="parts" path="common.tabs" config="parent:window;margin:@{user.isFullEngineer ? 60 : 0};focus:common/selected"></ui-component>
+				<ui-component name="parts" path="common.tabs" config="parent:window;margin:60;focus:common/selected"></ui-component>
 			</div>
 
 			<ui-component name="importer" path="common.form" config="if:streamform;url:@{#}/forms/stream.html"></ui-component>
@@ -266,6 +266,10 @@
 					plugin.import && $(document.body).append('<ui-import config="url:{0};id:_{1}"></ui-import>'.format('@{#}/_' + plugin.id + '/' + plugin.import, plugin.id));
 				});
 			})();
+
+			WATCH('common.flowfullscreen', function(path, value) {
+				$('.appmain').tclass('is-fullscreen', value);
+			});
 
 			exports.refresh = function() {
 				exports.tapi('streams ERROR', function(response) {
@@ -606,7 +610,7 @@
 				if (items.length)
 					items.push('-');
 
-				if (!model.openplatform && !user.openplatform)
+				if (!model.openplatform && !user.openplatform && !user.sso)
 					items.push({ id: 'password', name: '@(Change credentials)', icon: 'ti ti-key' });
 
 				if (user.sa) {
@@ -627,7 +631,7 @@
 					}
 				}
 
-				if (!model.openplatform) {
+				if (!model.openplatform && !user.sso) {
 					items.push('-');
 					items.push({ id: 'logout', name: '@(Sign out)', icon: 'ti ti-sign-out red' });
 				}
@@ -811,6 +815,11 @@
 								SET('streamform @reset', response);
 								SET('common.form @hideloading', 'streamform');
 							});
+							break;
+						case 'flowfullscreen':
+							SET('common.flowfullscreen', !data.collapse);
+							// Emitting event to the parent window to toggle fullscreen mode for the flow designer
+							//W.parent && W.parent.postMessage(STRINGIFY({ TYPE: 'flowfullscreen', SOURCE: 'flow', collapse: data.collapse }), '*');
 							break;
 					}
 				}
