@@ -267,8 +267,22 @@
 				});
 			})();
 
+			exports.darkmode = function(isDark) {
+				$('body').tclass('ui-dark', isDark);
+				var win = $('.ui-parts-item');
+				for (var i = 0; i < win.length; i++) {
+					var w = $(win[i]).find('iframe')[0];
+					if (w)
+						w.contentWindow.postMessage(STRINGIFY({ TYPE: 'darkmode', value: isDark }), '*');
+				}
+			};
+
 			WATCH('common.flowfullscreen', function(path, value) {
 				$('.appmain').tclass('is-fullscreen', value);
+				FIND('parts', function(com) {
+					com.config.margin = value ? 0 : 60;
+				});
+				setTimeout(function() { EMIT('resize'); }, 50);
 			});
 
 			exports.refresh = function() {
@@ -769,7 +783,8 @@
 			};
 
 			ON('resize + resize2', function() {
-				$('.iflowstream').css({ width: WW - model.appmenuwidth });
+				var offset = GET('common.flowfullscreen') ? 0 : model.appmenuwidth;
+				$('.iflowstream').css({ width: WW - offset });
 			});
 
 			ON('ready', exports.stats);
@@ -780,7 +795,6 @@
 			}, 10000);
 
 			$(W).on('message', function(e) {
-
 				var data = e.originalEvent.data;
 				if (data)
 					data = PARSE(data);
@@ -819,9 +833,11 @@
 						case 'flowfullscreen':
 							SET('common.flowfullscreen', !data.collapse);
 							// Emitting event to the parent window to toggle fullscreen mode for the flow designer
-							//W.parent && W.parent.postMessage(STRINGIFY({ TYPE: 'flowfullscreen', SOURCE: 'flow', collapse: data.collapse }), '*');
+							W.parent && W.parent.postMessage({ topic: 'fullscreen', source: 'acre-flow', isFullscreen: !data.collapse }, '*');
 							break;
 					}
+				} else if (data && data.source === 'webserver' && data.topic === 'theme') {
+					EXEC('common/darkmode', data.theme === 'dark');
 				}
 			});
 

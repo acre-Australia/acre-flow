@@ -23,8 +23,18 @@
 	transition: opacity 0.25s ease;
 }
 .flow-fullscreen section[data-type="left"] {
-	opacity: 0;
-	pointer-events: none;
+	display: none !important;
+}
+.flow-fullscreen section[data-type="bottom"] {
+	display: none !important;
+}
+.flow-fullscreen section[data-type="main"] {
+	left: 0 !important;
+	right: 0 !important;
+	top: 0 !important;
+	bottom: 0 !important;
+	width: auto !important;
+	height: auto !important;
 }
 
 /* Floating expand button */
@@ -48,6 +58,8 @@
 	border: none;
 	font-size: 15px;
 	padding: 0;
+	background-color: #592e53;
+	color: #fff;
 }
 .flow-fullscreen #flow-floating-btn {
 	visibility: visible;
@@ -1722,7 +1734,6 @@
 			var pluginEl = $('ui-plugin[name="flow"]');
 			var isCollapsed = !pluginEl.hclass('flow-fullscreen');
 			var next = !isCollapsed;
-			localStorage.setItem(LS_KEY, next ? '1' : '0');
 			applyCollapsed(next, true);
 		};
 
