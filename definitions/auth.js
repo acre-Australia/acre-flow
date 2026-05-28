@@ -17,7 +17,8 @@ AUTH(function($) {
 		var session = DECRYPTREQ($, token, CONF.cookie_secret);
 		if (session && session.id === PREF.user.id && session.expire > NOW) {
 			var user = {};
-			user.sa = true;
+			user.sa = session.sa;
+			user.sso = session.sso;
 			user.permissions = session.permissions instanceof Array ? session.permissions : [];
 			$.success(user);
 			return;

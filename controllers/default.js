@@ -122,7 +122,11 @@ function sso($) {
 	session.id = PREF.user.id;
 	session.expire = NOW.add('1 month');
 	session.isFullEngineer = payload.roles && payload.roles.includes('FullEngineer');
-	session.permissions = payload.permissions instanceof Array ? payload.permissions : [];
+	session.sa = false;
+	session.sso = true;
+	session.permissions = [
+		...(payload.permissions instanceof Array ? payload.permissions : []),
+	];
 	$.cookie(CONF.cookie, ENCRYPTREQ($, session, CONF.cookie_secret), '1 month');
 
 	var redirect = $.query.redirect || appurl('/');

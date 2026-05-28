@@ -115,15 +115,14 @@
 
 				hide();
 				document.title = model.name + ' (' + model.env + ')';
-				$('body').tclass('ui-dark', model.darkmode == true);
 				SET('common.env', model.env);
+				EXEC('common/darkmode', model.darkmode === true);
 
 				var win = $('.ui-parts-item');
 				for (var i = 0; i < win.length; i++) {
 					var w = $(win[i]).find('iframe')[0];
 					if (w) {
 						w = w.contentWindow;
-						w.postMessage(STRINGIFY({ TYPE: 'darkmode', value: model.darkmode === true }), '*');
 						w.postMessage(STRINGIFY({ TYPE: 'components', value: model.components }), '*');
 						w.postMessage(STRINGIFY({ TYPE: 'components2', value: model.components2 }), '*');
 					}
