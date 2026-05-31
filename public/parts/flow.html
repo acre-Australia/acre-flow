@@ -901,7 +901,6 @@
 
 					setTimeout(function() {
 						for (var i = 0; i < newlyconnected.length; i++) {
-							console.log('### Newly connected: ' + newlyconnected[i]);
 							SETTER('websocket/send', {
 								TYPE: 'call',
 								id: newlyconnected[i],
@@ -911,6 +910,22 @@
 								},
 								callbackid: GUID(10)
 							});
+						}
+						var pendingreplay = common.pendingreplay || [];
+						if (pendingreplay.length) {
+							for (var i = 0; i < pendingreplay.length; i++) {
+								var item = pendingreplay[i];
+								SETTER('websocket/send', {
+									TYPE: 'call',
+									id: item.fromid,
+									data: {
+										topic: 'replayOutput',
+										payload: item.fromindex
+									},
+									callbackid: GUID(10)
+                });
+							}
+							common.pendingreplay = [];
 						}
 					}, 100);
 				}});
@@ -1354,8 +1369,21 @@
 		};
 
 		exports.onconnect = function(meta) {
-			if (flow.ready && !meta.init)
-				SET('flow.changed', true);
+			if (flow.ready && !meta.init) {
+        SET('flow.changed', true);
+
+        if (!common.pendingreplay)
+            common.pendingreplay = [];
+
+        common.pendingreplay.push({
+            fromid: meta.fromid,
+            fromindex: meta.fromindex,
+            toid: meta.toid,
+            toindex: meta.toindex
+        });
+				console.log('### New connection: ', meta);
+
+    	}
 		};
 
 		exports.onpause = function(key, is) {
