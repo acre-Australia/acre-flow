@@ -843,6 +843,7 @@
 
 				var model = flow.data;
 				var output = {};
+				var newlyconnected = [];
 				var keys = Object.keys(model);
 
 				for (var i = 0; i < keys.length; i++) {
@@ -877,14 +878,42 @@
 					item.note = com.note;
 					item.tab = com.tab;
 					item.connected = true;
+
+					var wasconnected = com.connected === true;
 					com.changes = null;
 					com.connected = true;
+
+					if (!wasconnected)
+						newlyconnected.push(item.id);
+
 					output[item.id] = item;
 				}
 
 				$('.isnewbie').rclass('isnewbie');
 				SET('?.changed', false);
-				SETTER('websocket/send', { TYPE: 'save', data: output });
+				SETTER('websocket/send', { TYPE: 'save', data: output, callback: function(response) {
+
+					if (response && response.error)
+						return;
+
+					if (common.dataStream == null || !newlyconnected.length)
+						return;
+
+					setTimeout(function() {
+						for (var i = 0; i < newlyconnected.length; i++) {
+							console.log('### Newly connected: ' + newlyconnected[i]);
+							SETTER('websocket/send', {
+								TYPE: 'call',
+								id: newlyconnected[i],
+								data: {
+									topic: 'dataStream',
+									payload: common.dataStream
+								},
+								callbackid: GUID(10)
+							});
+						}
+					}, 100);
+				}});
 				Designer.CMD('flow.reset');
 			});
 
