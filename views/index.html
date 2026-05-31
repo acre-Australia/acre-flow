@@ -166,6 +166,7 @@
 		common.templates = '@{PREF.templates}';
 		common.bundle = '@{F.isBundle}' === 'true';
 		common.cl = {}; // for additional codelists
+		common.dataStream = null; // for data stream from designer
 
 		if (user.color)
 			APPEARANCE({ color: user.color });
@@ -787,7 +788,10 @@
 				$('.iflowstream').css({ width: WW - offset });
 			});
 
-			ON('ready', exports.stats);
+			ON('ready', () => {
+				sendDataStream();
+				exports.stats();
+			});
 
 			setInterval(function() {
 				exports.stats();
@@ -835,9 +839,18 @@
 							// Emitting event to the parent window to toggle fullscreen mode for the flow designer
 							W.parent && W.parent.postMessage({ topic: 'fullscreen', source: 'acre-flow', isFullscreen: !data.collapse }, '*');
 							break;
+						case 'fetchDataStream': {
+							sendDataStream();
+							break;
+						}
 					}
-				} else if (data && data.source === 'webserver' && data.topic === 'theme') {
-					EXEC('common/darkmode', data.theme === 'dark');
+				} else if (data && data.source === 'webserver') {
+					if (data.topic === 'theme') {
+						EXEC('common/darkmode', data.theme === 'dark');
+					} else if (data.topic === 'dataStream') {
+						common.dataStream = data.data;
+						sendDataStream();
+					}
 				}
 			});
 
@@ -871,6 +884,14 @@
 			}
 
 			exports.mainmenu();
+
+			function sendDataStream() {
+				var win = $('.ui-parts-focused');
+				if (win.length) {
+					var w = win.find('iframe')[0];
+					w && w.contentWindow.postMessage(STRINGIFY({ TYPE: 'dataStream', data: common.dataStream }), '*');
+				}
+			}
 
 		});
 
