@@ -896,21 +896,21 @@
 					if (response && response.error)
 						return;
 
-					if (common.dataStream == null || !newlyconnected.length)
-						return;
-
 					setTimeout(function() {
-						for (var i = 0; i < newlyconnected.length; i++) {
-							SETTER('websocket/send', {
-								TYPE: 'call',
-								id: newlyconnected[i],
-								data: {
-									topic: 'dataStream',
-									payload: common.dataStream
-								},
-								callbackid: GUID(10)
-							});
+						if (common.dataStream != null && newlyconnected.length) {
+							for (var i = 0; i < newlyconnected.length; i++) {
+								SETTER('websocket/send', {
+									TYPE: 'call',
+									id: newlyconnected[i],
+									data: {
+										topic: 'dataStream',
+										payload: common.dataStream
+									},
+									callbackid: GUID(10)
+								});
+							}
 						}
+						
 						var pendingreplay = common.pendingreplay || [];
 						if (pendingreplay.length) {
 							for (var i = 0; i < pendingreplay.length; i++) {

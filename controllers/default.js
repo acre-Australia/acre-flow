@@ -126,6 +126,8 @@ function sso($) {
 	session.sso = true;
 	session.permissions = [
 		...(payload.permissions instanceof Array ? payload.permissions : []),
+		'create',
+		'remove'
 	];
 	$.cookie(CONF.cookie, ENCRYPTREQ($, session, CONF.cookie_secret), '1 month');
 
