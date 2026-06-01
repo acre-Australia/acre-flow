@@ -569,7 +569,7 @@
 							});
 							break;
 						case 'remove':
-							user.sa && EXEC('-approve/show', '@(Are you sure you want to remove selected FlowStream "{0}"?)'.format(item.name), '"ti ti-remove" @(Remove)', function() {
+							(user.sa || user.permissions.includes('remove')) && EXEC('-approve/show', '@(Are you sure you want to remove selected FlowStream "{0}"?)'.format(item.name), '"ti ti-remove" @(Remove)', function() {
 								exports.tapi('streams_remove/{0} ERROR'.format(id), exports.refresh);
 							});
 							break;

@@ -1,5 +1,27 @@
 const Fields = 'id,name:SafeString,author,version,icon:Icon,reference,group,url,cloning:Boolean,color:Color,readme,memory:Number,proxypath'.toJSONSchema();
 
+const DEFAULT_COMPONENTS_FILE = PATH.root('defaultComponents.json');
+let DEFAULT_COMPONENTS;
+
+function loaddefaultcomponents() {
+	if (DEFAULT_COMPONENTS)
+		return DEFAULT_COMPONENTS;
+
+	try {
+		var body = F.Fs.readFileSync(DEFAULT_COMPONENTS_FILE, 'utf8');
+		var parsed = body ? body.toString('utf8').parseJSON(true) : null;
+		if (parsed && parsed.components && parsed.components.constructor === Object)
+			DEFAULT_COMPONENTS = parsed.components;
+		else
+			DEFAULT_COMPONENTS = {};
+	} catch (e) {
+		DEFAULT_COMPONENTS = {};
+		F.error('Failed to load default components from ' + DEFAULT_COMPONENTS_FILE, e);
+	}
+
+	return DEFAULT_COMPONENTS;
+}
+
 NEWACTION('Streams/query', {
 	name: 'Query streams',
 	action: function($) {
@@ -74,7 +96,7 @@ NEWACTION('Streams/save', {
 
 			model.id = 'f' + UID();
 			model.design = {};
-			model.components = {};
+			model.components = CLONE(loaddefaultcomponents());
 			model.variables = {};
 			model.sources = {};
 			model.dtcreated = NOW;
