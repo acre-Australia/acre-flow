@@ -258,6 +258,7 @@
 		var flowstreamid = common.socket.split('/').trim()[3];
 		var init = false;
 		var sourcecache = {};
+		var autosavetimer = null;
 
 		exports.init = function() {
 
@@ -566,8 +567,10 @@
 
 						if (type === 'group')
 							SETTER('websocket/send', { TYPE: 'groups', data: flow.data.groups });
-						else
+						else {
 							SET('flow.changed', true);
+							exports.autosave();
+						}
 
 						break;
 					case 'clone':
@@ -834,6 +837,116 @@
 			}
 		};
 
+		var persistflow = function(issilent) {
+
+			var model = flow.data;
+			var output = {};
+			var newlyconnected = [];
+			var keys = Object.keys(model);
+
+			for (var i = 0; i < keys.length; i++) {
+				var key = keys[i];
+				var com = model[key];
+
+				if (key === 'paused' || key === 'groups' || key === 'tabs') {
+					output[key] = com;
+					continue;
+				}
+
+				var item = {};
+
+				item.id = com.id;
+				item.connections = com.connections;
+				item.config = com.config;
+				item.component = com.component;
+
+				// Check if the component exists
+				var c = flow.components.findItem('id', com.component);
+				if (!c)
+					continue;
+
+				if (com.outputs)
+					item.outputs = checkio(com.outputs, c.outputs);
+
+				if (com.inputs)
+					item.inputs = checkio(com.inputs, c.inputs);
+
+				item.x = com.x;
+				item.y = com.y;
+				item.note = com.note;
+				item.tab = com.tab;
+				item.connected = true;
+
+				var wasconnected = com.connected === true;
+				com.changes = null;
+				com.connected = true;
+
+				if (!wasconnected)
+					newlyconnected.push(item.id);
+
+				output[item.id] = item;
+			}
+
+			$('.isnewbie').rclass('isnewbie');
+			SET('?.changed', false);
+			SETTER('websocket/send', { TYPE: 'save', data: output, callback: function(response) {
+
+				if (response && response.error) {
+					SET('?.changed', true);
+					!issilent && SETTER('notify/warning', response.error);
+					return;
+				}
+
+				setTimeout(function() {
+					if (common.dataStream != null && newlyconnected.length) {
+						for (var i = 0; i < newlyconnected.length; i++) {
+							SETTER('websocket/send', {
+								TYPE: 'call',
+								id: newlyconnected[i],
+								data: {
+									topic: 'dataStream',
+									payload: common.dataStream
+								},
+								callbackid: GUID(10)
+							});
+						}
+					}
+
+					var pendingreplay = common.pendingreplay || [];
+					if (pendingreplay.length) {
+						for (var i = 0; i < pendingreplay.length; i++) {
+							var item = pendingreplay[i];
+							SETTER('websocket/send', {
+								TYPE: 'call',
+								id: item.fromid,
+								data: {
+									topic: 'replayOutput',
+									payload: item.fromindex
+								},
+								callbackid: GUID(10)
+							});
+						}
+						common.pendingreplay = [];
+					}
+				}, 100);
+			}});
+			Designer.CMD('flow.reset');
+		};
+
+		exports.autosave = function() {
+
+			if (!flow.ready || !flow.changed)
+				return;
+
+			autosavetimer && clearTimeout(autosavetimer);
+			autosavetimer = setTimeout(function() {
+				autosavetimer = null;
+				if (!flow.changed || BLOCKED('save', 1000))
+					return;
+				persistflow(true);
+			}, 700);
+		};
+
 		exports.submit = function() {
 
 			SETTER('approve/show', '@(Are you sure you want to save and apply Flow?)', '"ti ti-check-circle" @(Continue)', function() {
@@ -841,95 +954,7 @@
 				if (BLOCKED('save', 2000))
 					return;
 
-				var model = flow.data;
-				var output = {};
-				var newlyconnected = [];
-				var keys = Object.keys(model);
-
-				for (var i = 0; i < keys.length; i++) {
-					var key = keys[i];
-					var com = model[key];
-
-					if (key === 'paused' || key === 'groups' || key === 'tabs') {
-						output[key] = com;
-						continue;
-					}
-
-					var item = {};
-
-					item.id = com.id;
-					item.connections = com.connections;
-					item.config = com.config;
-					item.component = com.component;
-
-					// Check if the component exists
-					var c = flow.components.findItem('id', com.component);
-					if (!c)
-						continue;
-
-					if (com.outputs)
-						item.outputs = checkio(com.outputs, c.outputs);
-
-					if (com.inputs)
-						item.inputs = checkio(com.inputs, c.inputs);
-
-					item.x = com.x;
-					item.y = com.y;
-					item.note = com.note;
-					item.tab = com.tab;
-					item.connected = true;
-
-					var wasconnected = com.connected === true;
-					com.changes = null;
-					com.connected = true;
-
-					if (!wasconnected)
-						newlyconnected.push(item.id);
-
-					output[item.id] = item;
-				}
-
-				$('.isnewbie').rclass('isnewbie');
-				SET('?.changed', false);
-				SETTER('websocket/send', { TYPE: 'save', data: output, callback: function(response) {
-
-					if (response && response.error)
-						return;
-
-					setTimeout(function() {
-						if (common.dataStream != null && newlyconnected.length) {
-							for (var i = 0; i < newlyconnected.length; i++) {
-								SETTER('websocket/send', {
-									TYPE: 'call',
-									id: newlyconnected[i],
-									data: {
-										topic: 'dataStream',
-										payload: common.dataStream
-									},
-									callbackid: GUID(10)
-								});
-							}
-						}
-						
-						var pendingreplay = common.pendingreplay || [];
-						if (pendingreplay.length) {
-							for (var i = 0; i < pendingreplay.length; i++) {
-								var item = pendingreplay[i];
-								SETTER('websocket/send', {
-									TYPE: 'call',
-									id: item.fromid,
-									data: {
-										topic: 'replayOutput',
-										payload: item.fromindex
-									},
-									callbackid: GUID(10)
-                });
-							}
-							common.pendingreplay = [];
-						}
-					}, 100);
-				}});
-				Designer.CMD('flow.reset');
+				persistflow(false);
 			});
 
 		};
@@ -1069,6 +1094,7 @@
 				SET('?.changed', true);
 				SET('?.config.' + obj.id, obj.config);
 				Designer.CMD('flow.components.add', obj);
+				exports.autosave();
 			}
 
 		};
@@ -1381,8 +1407,7 @@
             toid: meta.toid,
             toindex: meta.toindex
         });
-				console.log('### New connection: ', meta);
-
+				exports.autosave();
     	}
 		};
 
