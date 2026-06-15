@@ -89,6 +89,14 @@
 			isFullEngineer: false
 		};
 
+		function notifyParentActivity() {
+			W.parent.postMessage(STRINGIFY({ TYPE: 'activity', SOURCE: 'flow' }));
+		}
+
+		document.addEventListener('click', notifyParentActivity, true);
+		document.addEventListener('drag', notifyParentActivity, true);
+		document.addEventListener('scroll', notifyParentActivity, true);
+
 		@{if user.color}APPEARANCE({ color: '@{user.color}' });@{fi}
 
 		ON('@flag showloading', function() {

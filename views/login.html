@@ -15,6 +15,12 @@
 	<style>
 		body { background-color: #F2F5FE; }
 		.login { max-width: 300px; text-align: left; margin: 0 auto; width: 100%; }
+		.login.hidden { display: none; }
+		.login-loading { max-width: 300px; margin: 0 auto; width: 100%; text-align: center; color: #6b7280; }
+		.login-loading.hidden { display: none; }
+		.login-loading > div { background-color: #FFF; padding: 30px; border-radius: var(--radius); box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+		.login-loading .spinner { width: 30px; height: 30px; border: 3px solid #dbe4ff; border-top-color: var(--color); border-radius: 50%; margin: 0 auto 12px; animation: spin 0.9s linear infinite; }
+		@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 		.login > div { background-color: #FFF; padding: 30px; border-radius: var(--radius); box-shadow: 0 0 20px rgba(0,0,0,0.1); }
 		footer { font-size: 11px; color: #999; text-align: center; padding: 0 0 10px; }
 		footer a { color: #777; }
@@ -38,7 +44,16 @@
 	<ui-component name="exec"></ui-component>
 
 	<ui-component name="viewbox" config="centered:1;parent:window" class="invisible">
-		<div class="login" data-scope="signinform">
+		<div class="login-loading" data-id="login-loading">
+			<div>
+				<div class="spinner"></div>
+				<div>@(Loading ...)</div>
+			</div>
+			<br />
+			<footer>&copy; @{NOW.getFullYear()} - <a href="https://www.totaljs.com" target="_blank">@(Powered by <b>Total.js</b>)</a></footer>
+		</div>
+
+		<div class="login hidden" data-scope="signinform">
 			<div>
 				<ui-component name="autofill">
 
@@ -98,14 +113,28 @@
 	</script>
 
 	<script>
+		var loggingIn = true;
 		// If running inside a same-origin iframe/shell app, try to auto-login
 		// using the accessToken already stored in localStorage by the parent app.
 		(function() {
+			function updateLoginVisibility() {
+				var loading = document.querySelector('[data-id="login-loading"]');
+				if (loggingIn) {
+					loading && loading.classList.remove('hidden');
+				} else {
+					loading && loading.classList.add('hidden');
+				}
+			}
+
+			updateLoginVisibility();
 			try {
 				var token = localStorage.getItem('accessToken');
-				if (!token)
+				if (!token) {
+					loggingIn = false;
+					updateLoginVisibility();
 					return;
-
+				}
+				
 				fetch('@{#}/sso/', {
 					method: 'POST',
 					headers: {
@@ -115,10 +144,16 @@
 					credentials: 'include',
 					body: JSON.stringify({ redirect: '@{#}/' })
 				}).then(function(res) {
-					if (res.ok)
-						location.href = '@{#}/open/acre-flow';
+					loggingIn = false;
+					updateLoginVisibility();
+					if (res.ok) {
+						location.href = '@{#}/';
+					}	
 				});
-			} catch (e) {}
+			} catch (e) {
+				loggingIn = false;
+				updateLoginVisibility();
+			}
 		})();
 	</script>
 
