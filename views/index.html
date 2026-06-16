@@ -260,6 +260,15 @@
 			var checksum;
 			var loaded = false;
 
+			function notifyParentActivity() {
+				if (W.parent)
+					W.parent.postMessage({ topic: 'activity', source: 'acre-flow' }, '*');
+			}
+
+			document.addEventListener('click', notifyParentActivity, true);
+			document.addEventListener('drag', notifyParentActivity, true);
+			document.addEventListener('scroll', notifyParentActivity, true);
+
 			(function() {
 				model.plugins.quicksort('position');
 				model.plugins.forEach(function(plugin) {
@@ -841,6 +850,10 @@
 							break;
 						case 'fetchDataStream': {
 							sendDataStream();
+							break;
+						}
+						case 'activity': {
+							notifyParentActivity();
 							break;
 						}
 					}
