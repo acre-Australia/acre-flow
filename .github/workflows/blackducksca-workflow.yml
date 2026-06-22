@@ -1,0 +1,11 @@
+name: Black Duck SCA
+on:
+  push:
+    branches: [main, master, develop, stage, release]
+  pull_request:
+    branches: [main, master, develop, stage, release]
+  workflow_dispatch: {}
+jobs:
+  scan:
+    uses: acre-Australia/.github-private/.github/workflows/_blackducksca.yml@d34b60e8a060b881f16853157d240ad9421893c8
+    secrets: inherit
