@@ -1,11 +1,63 @@
-name: Black Duck SCA
+# Self-contained Black Duck SCA workflow (PUBLIC repos can't call an internal reusable workflow) for the acre-Australia org.
+# Ported from acresecurity/aac-secops. Repos call it with a ~12-line caller
+# (blackducksca-workflow.yml); all logic lives here — changes are one edit / one var flip.
+#
+# SCAN MODE (org var BLACKDUCK_PR_SCAN, default RAPID):
+#   pull_request + RAPID       -> RAPID  (fast; gates NEW Critical/High on the diff vs base)
+#   pull_request + INTELLIGENT -> full scan on PRs (slow on firmware; flip to scan everything)
+#   push / workflow_dispatch   -> INTELLIGENT full + snippet (persistent BOM + license; never blocks)
+#
+# GATING — runtime org variables (flip one => ALL repos on next run; SHA-pin-safe):
+#   BLACKDUCK_GATE         unset/'off' silent | 'CRITICAL' | 'CRITICAL,HIGH'
+#   BLACKDUCK_POLICY_GATE  unset/'off' silent | 'CRITICAL' (strong copyleft) | 'CRITICAL,MAJOR' (+weak)
+#   (a real merge-block also needs the 'blackducksca' check marked required in branch protection)
+#
+# GROUPING: BLACKDUCK_PROJECT_GROUP (org var) -> --detect.project.group.name (Australian rollup).
+# SARIF:    repo var BLACKDUCK_SARIF=on (firmware/binary repos only) -> upload BD findings to
+#           code scanning (push/dispatch only; needs code scanning enabled on the repo).
+# NOTE: callers must grant 'permissions: security-events: write' (org default token is read-only).
+name: _blackducksca (reusable)
+
 on:
-  push:
-    branches: [main, master, develop, stage, release]
-  pull_request:
-    branches: [main, master, develop, stage, release]
+  push: {}
+  pull_request: {}
   workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write   # used only when BLACKDUCK_SARIF=on (firmware/binary repos)
+
 jobs:
   scan:
-    uses: acre-Australia/.github-private/.github/workflows/_blackducksca.yml@d34b60e8a060b881f16853157d240ad9421893c8
-    secrets: inherit
+    name: ${{ github.event_name == 'pull_request' && (vars.BLACKDUCK_PR_SCAN == 'INTELLIGENT' && 'Intelligent (PR full)' || 'Rapid (PR diff)') || 'Intelligent (full)' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Scan
+        uses: blackduck-inc/black-duck-security-scan@3fe94e4b3c3947bd21ba46b7da255d6d3638b325 # v2
+        with:
+          blackducksca_url: ${{ vars.BLACKDUCKSCA_URL }}
+          blackducksca_token: ${{ secrets.BLACKDUCKSCA_TOKEN }}
+          # required by the action whenever SARIF upload is on (firmware/binary repos)
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # PR uses RAPID unless BLACKDUCK_PR_SCAN=INTELLIGENT; push/dispatch always full.
+          blackducksca_scan_full: ${{ (github.event_name == 'pull_request' && (vars.BLACKDUCK_PR_SCAN == '' || vars.BLACKDUCK_PR_SCAN == 'RAPID')) && 'false' || 'true' }}
+          detect_args: >-
+            --detect.project.name=${{ github.event.repository.name }}
+            --detect.project.version.name=${{ github.event_name == 'pull_request' && github.base_ref || github.ref_name }}
+            --detect.blackduck.signature.scanner.snippet.matching=SNIPPET_MATCHING
+            ${{ vars.BLACKDUCK_PROJECT_GROUP != '' && format('--detect.project.group.name={0}', vars.BLACKDUCK_PROJECT_GROUP) || '' }}
+            ${{ github.event_name != 'pull_request' && '--detect.timeout=3600 --detect.force.success=true' || '' }}
+            ${{ (github.event_name == 'pull_request' && vars.BLACKDUCK_POLICY_GATE != '' && vars.BLACKDUCK_POLICY_GATE != 'off') && format('--detect.policy.check.fail.on.severities={0}', vars.BLACKDUCK_POLICY_GATE) || '' }}
+          # SARIF -> code scanning: firmware/binary repos only (repo var BLACKDUCK_SARIF=on), push/dispatch only.
+          blackducksca_reports_sarif_create: ${{ (github.event_name != 'pull_request' && vars.BLACKDUCK_SARIF == 'on') && 'true' || 'false' }}
+          blackducksca_upload_sarif_report: ${{ (github.event_name != 'pull_request' && vars.BLACKDUCK_SARIF == 'on') && 'true' || 'false' }}
+          blackducksca_reports_sarif_severities: 'CRITICAL,HIGH'
+          blackducksca_reports_sarif_groupSCAIssues: 'true'
+          # push/dispatch never block. PRs block only when a gate is set. Both off = silent (default).
+          mark_build_status: ${{ (github.event_name != 'pull_request' || ((vars.BLACKDUCK_GATE == '' || vars.BLACKDUCK_GATE == 'off') && (vars.BLACKDUCK_POLICY_GATE == '' || vars.BLACKDUCK_POLICY_GATE == 'off'))) && 'success' || 'failure' }}
+          blackducksca_scan_failure_severities: ${{ (github.event_name == 'pull_request' && vars.BLACKDUCK_GATE != '' && vars.BLACKDUCK_GATE != 'off') && vars.BLACKDUCK_GATE || '' }}
