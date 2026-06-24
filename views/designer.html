@@ -88,6 +88,14 @@
 		common.user = {
 			isFullEngineer: false
 		};
+		common.dataStream = null;
+		common.payloads = {
+			config: [],
+			status: [],
+			app: [],
+			action: [],
+			signal: []
+		};
 
 		function notifyParentActivity() {
 			W.parent.postMessage(STRINGIFY({ TYPE: 'activity', SOURCE: 'flow' }));
@@ -146,7 +154,28 @@
 									callbackid: GUID(10)
 								});
 							});
-							
+							break;
+						case 'dataStream/config':
+						case 'dataStream/status':
+						case 'dataStream/app':
+						case 'dataStream/action':
+						case 'dataStream/signal':
+							const key = msg.TYPE.split('/').pop();
+							common.payloads[key] = msg.data;
+							// Push to all rendered flow component instances in designer (Front End)
+							W.flowinstances && W.flowinstances.exec('*', msg.TYPE, msg.data);
+							// Push data to back end
+							Object.keys(W.flowinstances.instances).forEach(id => {
+								SETTER('websocket/send', {
+									TYPE: 'call',
+									id: id,
+									data: {
+										topic: msg.TYPE,
+										payload: msg.data
+									},
+									callbackid: GUID(10)
+								});
+							});
 							break;
 					}
 				}

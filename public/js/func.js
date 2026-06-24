@@ -202,6 +202,22 @@ customElements.define('is-footer', class extends HTMLElement {
 					callbackid: GUID(10)
 				});
 			}
+			if (common.payloads != null) {
+				for (var key in common.payloads) {
+					var topic = 'dataStream/' + key;
+					var payload = common.payloads[key];
+					W.flowinstances && W.flowinstances.exec(instance.id, topic, payload);
+					SETTER('websocket/send', {
+						TYPE: 'call',
+						id: instance.id,
+						data: {
+							topic,
+							payload
+						},
+						callbackid: GUID(10)
+					});
+				}
+			}
 		}
 	};
 

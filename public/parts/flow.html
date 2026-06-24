@@ -898,17 +898,34 @@
 				}
 
 				setTimeout(function() {
-					if (common.dataStream != null && newlyconnected.length) {
+					if (newlyconnected.length) {
 						for (var i = 0; i < newlyconnected.length; i++) {
-							SETTER('websocket/send', {
-								TYPE: 'call',
-								id: newlyconnected[i],
-								data: {
-									topic: 'dataStream',
-									payload: common.dataStream
-								},
-								callbackid: GUID(10)
-							});
+							if (common.dataStream != null) {
+								SETTER('websocket/send', {
+									TYPE: 'call',
+									id: newlyconnected[i],
+									data: {
+										topic: 'dataStream',
+										payload: common.dataStream
+									},
+									callbackid: GUID(10)
+								});
+							}
+							if (common.payloads != null) {
+								for (var key in common.payloads) {
+									var topic = 'dataStream/' + key;
+									var payload = common.payloads[key];
+									SETTER('websocket/send', {
+										TYPE: 'call',
+										id: newlyconnected[i],
+										data: {
+											topic,
+											payload
+										},
+										callbackid: GUID(10)
+									});
+								}
+							}
 						}
 					}
 
