@@ -16,3 +16,4 @@ package-lock.json
 .env.*
 !.env.example
 defaultComponents.json
+definitions/acre*.js

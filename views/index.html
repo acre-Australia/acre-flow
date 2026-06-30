@@ -805,7 +805,6 @@
 			});
 
 			ON('ready', () => {
-				sendAllData();
 				exports.stats();
 			});
 
@@ -855,10 +854,6 @@
 							// Emitting event to the parent window to toggle fullscreen mode for the flow designer
 							W.parent && W.parent.postMessage({ topic: 'fullscreen', source: 'acre-flow', isFullscreen: !data.collapse }, '*');
 							break;
-						case 'fetchDataStream': {
-							sendAllData();
-							break;
-						}
 						case 'activity': {
 							notifyParentActivity();
 							break;
@@ -867,35 +862,6 @@
 				} else if (data && data.source === 'webserver') {
 					if (data.topic === 'theme') {
 						EXEC('common/darkmode', data.theme === 'dark');
-					} if (data.topic === 'dataStream') {
-						common.dataStream = data.data;
-						var serializedConfig = JSON.stringify(common.payloads.config);
-						var serializedStatus = JSON.stringify(common.payloads.status);
-						var serializedApp = JSON.stringify(common.payloads.app);
-						var serializedAction = JSON.stringify(common.payloads.action);
-						var serializedSignal = JSON.stringify(common.payloads.signal);
-
-						if (serializedConfig !== JSON.stringify(common.dataStream.data.config)) {
-							common.payloads.config = common.dataStream.data.config;
-							sendDataStream('dataStream/config', common.payloads.config);
-						}
-						if (serializedStatus !== JSON.stringify(common.dataStream.data.status)) {
-							common.payloads.status = common.dataStream.data.status;
-							sendDataStream('dataStream/status', common.payloads.status);
-						}
-						if (serializedApp !== JSON.stringify(common.dataStream.data.app)) {
-							common.payloads.app = common.dataStream.data.app;
-							sendDataStream('dataStream/app', common.payloads.app);
-						}
-						if (serializedAction !== JSON.stringify(common.dataStream.data.action)) {
-							common.payloads.action = common.dataStream.data.action;
-							sendDataStream('dataStream/action', common.payloads.action);
-						}
-						if (serializedSignal !== JSON.stringify(common.dataStream.data.signal)) {
-							common.payloads.signal = common.dataStream.data.signal;
-							sendDataStream('dataStream/signal', common.payloads.signal);
-						}
-						sendDataStream('dataStream', common.dataStream);
 					}
 				}
 			});
@@ -930,25 +896,6 @@
 			}
 
 			exports.mainmenu();
-
-			function sendAllData() {
-				sendDataStream('dataStream', common.dataStream);
-				sendDataStream('dataStream/config', common.payloads.config);
-				sendDataStream('dataStream/status', common.payloads.status);
-				sendDataStream('dataStream/app', common.payloads.app);
-				sendDataStream('dataStream/action', common.payloads.action);
-				sendDataStream('dataStream/signal', common.payloads.signal);
-			}
-
-			function sendDataStream(topic, data) {
-				var win = $('.ui-parts-focused');
-				if (win.length) {
-					var w = win.find('iframe')[0];
-					if (!w) return;
-					var _type = topic || 'dataStream';
-					w.contentWindow.postMessage(STRINGIFY({ TYPE: _type, data }), '*');		
-				}
-			}
 
 		});
 

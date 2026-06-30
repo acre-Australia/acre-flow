@@ -115,9 +115,51 @@
 			SETTER('loading/hide', 1000);
 		});
 
-		ON('ready', () => {
-			W.parent.postMessage(STRINGIFY({ TYPE: 'fetchDataStream', SOURCE: 'flow' }));
-		});
+		ON('message', function(msg) {
+			function sendDataStream(topic, data) {
+				Object.keys(W.flowinstances.instances).forEach(id => {
+					SETTER('websocket/send', {
+						TYPE: 'call',
+						id: id,
+						data: {
+							topic: topic,
+							payload: data
+						},
+						callbackid: GUID(10)
+					});
+				});
+			}
+
+			if (msg.TYPE === 'acre/event' && msg.data && msg.data.topic === 'dataStream') {
+				common.dataStream = msg.data.payload;
+				var serializedConfig = JSON.stringify(common.payloads.config);
+				var serializedStatus = JSON.stringify(common.payloads.status);
+				var serializedApp = JSON.stringify(common.payloads.app);
+				var serializedAction = JSON.stringify(common.payloads.action);
+				var serializedSignal = JSON.stringify(common.payloads.signal);
+
+				if (serializedConfig !== JSON.stringify(common.dataStream.data.config)) {
+					common.payloads.config = common.dataStream.data.config;
+					sendDataStream('dataStream/config', common.payloads.config);
+				}
+				if (serializedStatus !== JSON.stringify(common.dataStream.data.status)) {
+					common.payloads.status = common.dataStream.data.status;
+					sendDataStream('dataStream/status', common.payloads.status);
+				}
+				if (serializedApp !== JSON.stringify(common.dataStream.data.app)) {
+					common.payloads.app = common.dataStream.data.app;
+					sendDataStream('dataStream/app', common.payloads.app);
+				}
+				if (serializedAction !== JSON.stringify(common.dataStream.data.action)) {
+					common.payloads.action = common.dataStream.data.action;
+					sendDataStream('dataStream/action', common.payloads.action);
+				}
+				if (serializedSignal !== JSON.stringify(common.dataStream.data.signal)) {
+					common.payloads.signal = common.dataStream.data.signal;
+					sendDataStream('dataStream/signal', common.payloads.signal);
+				}
+			}
+    });
 
 		$(W).on('message', function(e) {
 			var data = e.originalEvent.data;
@@ -136,46 +178,6 @@
 							break;
 						case 'components2':
 							common.components2 = msg.value;
-							break;
-						case 'dataStream':
-							common.dataStream = msg.data;
-							// Push to all rendered flow component instances in designer (Front End)
-							W.flowinstances && W.flowinstances.exec('*', 'dataStream', msg.data);
-
-							// Push data to back end
-							Object.keys(W.flowinstances.instances).forEach(id => {
-								SETTER('websocket/send', {
-									TYPE: 'call',
-									id: id,
-									data: {
-										topic: 'dataStream',
-										payload: msg.data
-									},
-									callbackid: GUID(10)
-								});
-							});
-							break;
-						case 'dataStream/config':
-						case 'dataStream/status':
-						case 'dataStream/app':
-						case 'dataStream/action':
-						case 'dataStream/signal':
-							const key = msg.TYPE.split('/').pop();
-							common.payloads[key] = msg.data;
-							// Push to all rendered flow component instances in designer (Front End)
-							W.flowinstances && W.flowinstances.exec('*', msg.TYPE, msg.data);
-							// Push data to back end
-							Object.keys(W.flowinstances.instances).forEach(id => {
-								SETTER('websocket/send', {
-									TYPE: 'call',
-									id: id,
-									data: {
-										topic: msg.TYPE,
-										payload: msg.data
-									},
-									callbackid: GUID(10)
-								});
-							});
 							break;
 					}
 				}
