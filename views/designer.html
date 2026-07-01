@@ -116,20 +116,6 @@
 		});
 
 		ON('message', function(msg) {
-			function sendDataStream(topic, data) {
-				Object.keys(W.flowinstances.instances).forEach(id => {
-					SETTER('websocket/send', {
-						TYPE: 'call',
-						id: id,
-						data: {
-							topic: topic,
-							payload: data
-						},
-						callbackid: GUID(10)
-					});
-				});
-			}
-
 			if (msg.TYPE === 'acre/event' && msg.data && msg.data.topic === 'dataStream') {
 				common.dataStream = msg.data.payload;
 				var serializedConfig = JSON.stringify(common.payloads.config);
@@ -140,23 +126,18 @@
 
 				if (serializedConfig !== JSON.stringify(common.dataStream.data.config)) {
 					common.payloads.config = common.dataStream.data.config;
-					sendDataStream('dataStream/config', common.payloads.config);
 				}
 				if (serializedStatus !== JSON.stringify(common.dataStream.data.status)) {
 					common.payloads.status = common.dataStream.data.status;
-					sendDataStream('dataStream/status', common.payloads.status);
 				}
 				if (serializedApp !== JSON.stringify(common.dataStream.data.app)) {
 					common.payloads.app = common.dataStream.data.app;
-					sendDataStream('dataStream/app', common.payloads.app);
 				}
 				if (serializedAction !== JSON.stringify(common.dataStream.data.action)) {
 					common.payloads.action = common.dataStream.data.action;
-					sendDataStream('dataStream/action', common.payloads.action);
 				}
 				if (serializedSignal !== JSON.stringify(common.dataStream.data.signal)) {
 					common.payloads.signal = common.dataStream.data.signal;
-					sendDataStream('dataStream/signal', common.payloads.signal);
 				}
 			}
     });
