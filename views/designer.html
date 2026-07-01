@@ -118,27 +118,11 @@
 		ON('message', function(msg) {
 			if (msg.TYPE === 'acre/event' && msg.data && msg.data.topic === 'dataStream') {
 				common.dataStream = msg.data.payload;
-				var serializedConfig = JSON.stringify(common.payloads.config);
-				var serializedStatus = JSON.stringify(common.payloads.status);
-				var serializedApp = JSON.stringify(common.payloads.app);
-				var serializedAction = JSON.stringify(common.payloads.action);
-				var serializedSignal = JSON.stringify(common.payloads.signal);
-
-				if (serializedConfig !== JSON.stringify(common.dataStream.data.config)) {
-					common.payloads.config = common.dataStream.data.config;
-				}
-				if (serializedStatus !== JSON.stringify(common.dataStream.data.status)) {
-					common.payloads.status = common.dataStream.data.status;
-				}
-				if (serializedApp !== JSON.stringify(common.dataStream.data.app)) {
-					common.payloads.app = common.dataStream.data.app;
-				}
-				if (serializedAction !== JSON.stringify(common.dataStream.data.action)) {
-					common.payloads.action = common.dataStream.data.action;
-				}
-				if (serializedSignal !== JSON.stringify(common.dataStream.data.signal)) {
-					common.payloads.signal = common.dataStream.data.signal;
-				}
+				common.payloads.config = common.dataStream.data.config;
+				common.payloads.status = common.dataStream.data.status;
+				common.payloads.app = common.dataStream.data.app;
+				common.payloads.action = common.dataStream.data.action;
+				common.payloads.signal = common.dataStream.data.signal;
 			}
     });
 
