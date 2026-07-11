@@ -16,3 +16,4 @@ index.js.overload
 !.env.example
 defaultComponents.json
 definitions/acre*.js
+definitions/helper/
