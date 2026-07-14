@@ -10,9 +10,10 @@ logs/
 databases/
 index.js.overload
 .vscode/launch.json
-package-lock.json
 /index.js.map
 .env
 .env.*
 !.env.example
 defaultComponents.json
+definitions/acre*.js
+definitions/helper/

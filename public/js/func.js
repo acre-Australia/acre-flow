@@ -188,20 +188,6 @@ customElements.define('is-footer', class extends HTMLElement {
 			obj.configure && obj.configure(flow.config[instance.id], true);
 			obj.status && obj.status(flow.status[instance.id], true);
 			obj.note && obj.note(flow.note[instance.id], true);
-
-			// dataStream may be delivered before the instance exists; replay latest payload on init
-			if (common.dataStream != null) {
-				W.flowinstances && W.flowinstances.exec(instance.id, 'dataStream', common.dataStream);
-				SETTER('websocket/send', {
-					TYPE: 'call',
-					id: instance.id,
-					data: {
-						topic: 'dataStream',
-						payload: common.dataStream
-					},
-					callbackid: GUID(10)
-				});
-			}
 		}
 	};
 
