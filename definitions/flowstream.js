@@ -55,8 +55,12 @@ function patchflowcomponents(db, defaults) {
 	return patched;
 }
 
-Flow.on('save', function() {
+var SAVE_RUNNING = false;
+var SAVE_PENDING = false;
 
+function flowdb_write(callback) {
+
+	// Snapshot the db synchronously so nothing mutates it mid-serialize
 	for (var key in Flow.db) {
 		if (key !== 'variables') {
 			var flow = Flow.db[key];
@@ -64,12 +68,58 @@ Flow.on('save', function() {
 		}
 	}
 
-	if (CONF.backup) {
-		PATH.fs.rename(PATH.join(DIRECTORY, DB_FILE), PATH.join(DIRECTORY, DB_FILE.replace(/\.json/, '') + '_' + (new Date()).format('yyyyMMddHHmm') + '.bk'), function() {
-			PATH.fs.writeFile(PATH.join(DIRECTORY, DB_FILE), JSON.stringify(Flow.db, skip, '\t'), ERROR('FlowStream.save'));
+	var body = JSON.stringify(Flow.db, skip, '\t');
+	var dest = PATH.join(DIRECTORY, DB_FILE);
+	var tmp = dest + '.tmp';
+
+	// Optional backup of the current (still-intact) file before replacing it
+	var backup = function(next) {
+		if (!CONF.backup)
+			return next();
+		var bk = PATH.join(DIRECTORY, DB_FILE.replace(/\.json/, '') + '_' + (new Date()).format('yyyyMMddHHmm') + '.bk');
+		PATH.fs.copyFile(dest, bk, function() {
+			// Ignore copy errors (e.g. first-ever save, no file yet) — must not block the write
+			next();
 		});
-	} else
-		PATH.fs.writeFile(PATH.join(DIRECTORY, DB_FILE), JSON.stringify(Flow.db, skip, '\t'), ERROR('FlowStream.save'));
+	};
+
+	backup(function() {
+		// Write to a temp file first, then atomically rename over the real file.
+		// A concurrent reader / the next boot always sees either the old or the
+		// new *complete* file — never a truncated or half-written one.
+		PATH.fs.writeFile(tmp, body, function(err) {
+			if (err) {
+				ERROR('FlowStream.save')(err);
+				return callback();
+			}
+			PATH.fs.rename(tmp, dest, function(err) {
+				err && ERROR('FlowStream.save')(err);
+				callback();
+			});
+		});
+	});
+}
+
+Flow.on('save', function() {
+
+	// Serialize: only one write may be in flight at a time. Overlapping
+	// emit('save') calls collapse into a single follow-up write.
+	if (SAVE_RUNNING) {
+		SAVE_PENDING = true;
+		return;
+	}
+
+	SAVE_RUNNING = true;
+
+	(function run() {
+		SAVE_PENDING = false;
+		flowdb_write(function() {
+			if (SAVE_PENDING)
+				run();
+			else
+				SAVE_RUNNING = false;
+		});
+	})();
 });
 
 function init(id, next) {
@@ -102,9 +152,6 @@ ON('init', function() {
 
 		if (!Flow.db.variables)
 			Flow.db.variables = {};
-
-		if (patched)
-			Flow.emit('save');
 
 		Object.keys(Flow.db).wait(function(key, next) {
 			if (key === 'variables')
