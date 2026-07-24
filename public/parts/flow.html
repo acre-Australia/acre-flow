@@ -926,6 +926,15 @@
 									});
 								}
 							}
+							SETTER('websocket/send', {
+								TYPE: 'call',
+								id: newlyconnected[i],
+								data: {
+									topic: 'ready',
+									payload: null,
+								},
+								callbackid: GUID(10)
+							});
 						}
 					}
 
