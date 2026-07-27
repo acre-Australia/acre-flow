@@ -35,8 +35,9 @@ if (Object.keys(secureConfig).length)
 // options.inspector = 9229;
 // options.watch = ['private'];
 // options.livereload = 'https://yourhostname';
-// options.watcher = true; // enables watcher for the release mode only controlled by the app `F.restart()`
 // options.edit = 'wss://www.yourcodeinstance.com/?id=projectname'
+
+options.watcher = process.argv.includes('--watcher');
 options.release = process.argv.includes('--release');
 
 // Service mode:
