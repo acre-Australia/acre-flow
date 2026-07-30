@@ -12,7 +12,8 @@
     "total5": "latest"
   },
   "scripts": {
-    "start": "node index.js 1880"
+    "dev": "node index.js 1880 --watcher",
+    "start": "node index.js 1880 --release"
   },
   "keywords": [
     "flow",
