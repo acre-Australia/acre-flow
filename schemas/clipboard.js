@@ -23,6 +23,19 @@ NEWACTION('Clipboard/import', {
 			return;
 		}
 
+		var err = MODS.limits.canaddflow();
+		if (err) {
+			$.invalid(err);
+			return;
+		}
+
+		// The designer limit applies to an imported design too
+		err = MODS.limits.checknodes(data.design);
+		if (err) {
+			$.invalid(err);
+			return;
+		}
+
 		data.id = 'f' + UID();
 
 		delete data.unixsocket;
