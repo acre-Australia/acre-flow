@@ -837,6 +837,31 @@
 			}
 		};
 
+		// Number of components currently on the canvas (paused/groups/tabs are not components)
+		var countnodes = function() {
+			var count = 0;
+			for (var key in flow.data) {
+				if (key !== 'paused' && key !== 'groups' && key !== 'tabs')
+					count++;
+			}
+			return count;
+		};
+
+		// Returns true (and alerts) when adding "count" more components would exceed the limit,
+		// so the caller can bail out before the component lands on the canvas.
+		// The server enforces the same limit in controllers/api.js, this is only for a clear message.
+		var exceedsnodes = function(count) {
+
+			var max = common.maxnodes;
+			var current = countnodes();
+
+			if (!max || (current + count) <= max)
+				return false;
+
+			SETTER('message/warning', '@(This FlowStream is limited to {0} components and already contains {1}.)'.format(max, current));
+			return true;
+		};
+
 		var persistflow = function(issilent) {
 
 			var model = flow.data;
@@ -993,6 +1018,9 @@
 			var cloned = {};
 			var now = Date.now();
 
+			if (exceedsnodes(selected.components.length))
+				return;
+
 			for (var item of selected.components) {
 				var instance = model.data[item.id];
 				var newbie = {};
@@ -1084,6 +1112,9 @@
 			} else {
 				var com = flow.components.findItem('id', id);
 				var obj = {};
+
+				if (exceedsnodes(1))
+					return;
 
 				if (com.meta && com.meta.singleton) {
 
@@ -1595,9 +1626,13 @@
 				var cb = flow.callbacks[msg.callbackid];
 				if (cb) {
 					delete flow.callbacks[msg.callbackid];
-					if (msg.error)
-						cb.callback([{ error: msg.error }]);
-					else
+					if (msg.error) {
+						// Wrapped in an array for "message/response", but the property is
+						// also set directly so callers testing "response.error" still see it
+						var err = [{ error: msg.error }];
+						err.error = msg.error;
+						cb.callback(err);
+					} else
 						cb.callback(msg);
 				}
 			}
@@ -2131,6 +2166,9 @@
 			var add = [];
 			var cloned = {};
 			var now = Date.now();
+
+			if (exceedsnodes(items.length))
+				return;
 
 			fix_positions(items, pos);
 

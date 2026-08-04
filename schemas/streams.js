@@ -63,8 +63,15 @@ NEWACTION('Streams/save', {
 		var init = !model.id;
 
 		if (init) {
+
 			if (UNAUTHORIZED($, 'create'))
 				return;
+
+			let err = MODS.limits.canaddflow();
+			if (err) {
+				$.invalid(err);
+				return;
+			}
 		}
 
 		var db = Flow.db;

@@ -41,7 +41,18 @@ exports.install = function() {
 };
 
 function socket($) {
-	Flow.socket($.params.id, $);
+	Flow.socket($.params.id, $, null, checkmessage);
+}
+
+// Runs in the parent process before the message is forwarded to the worker.
+// Must return true to allow; a returned string is sent back to the client as an error.
+function checkmessage(client, msg) {
+
+	// The designer always saves the whole design at once
+	if (msg.TYPE === 'save')
+		return MODS.limits.checknodes(msg.data) || true;
+
+	return true;
 }
 
 function privatefiles($) {
