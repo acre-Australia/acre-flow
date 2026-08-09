@@ -78,7 +78,7 @@ NEWACTION('Clipboard/import', {
 		Flow.db[data.id] = data;
 		Flow.load(data, function(err) {
 			$.callback({ success: true, value: data.id, error: err ? err.toString() : null });
-			Flow.save();
+			Flow.save(data);
 		});
 	}
 });

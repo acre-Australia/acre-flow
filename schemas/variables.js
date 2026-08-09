@@ -30,7 +30,7 @@ NEWACTION('Variables/save', {
 			var fs = Flow.db[id];
 			if (fs) {
 				fs.variables = model.data;
-				Flow.emit('save');
+				Flow.emit('save', { id: id });
 				Flow.instances[id].variables(fs.variables);
 			} else {
 				$.invalid(404);
@@ -40,7 +40,9 @@ NEWACTION('Variables/save', {
 		} else {
 
 			Flow.db.variables = model.data;
-			Flow.emit('save');
+			// Only variables.json needs rewriting: the per-flow variables2 copy is
+			// re-derived on load and never persisted
+			MODS.flowdb.markvariables();
 
 			for (let key in Flow.instances) {
 				let instance = Flow.instances[key];
