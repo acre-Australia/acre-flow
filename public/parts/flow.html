@@ -115,6 +115,7 @@
 
 		<div>
 			<button title="@(Options)" class="exec" data-exec="?/options"><i class="ti ti-cog"></i></button>
+			<button title="@(Backup)" class="exec" data-exec="?/managebackup"><i class="ti ti-database-alt"></i></button>
 			<button title="@(Collapse)" class="exec" data-exec="?/togglefullscreen" id="flow-collapse-btn"><i class="ti ti-fullscreen"></i></button>
 		</div>
 
@@ -255,7 +256,14 @@
 		var checksums = {};
 		var settings_current;
 		var settings_data;
-		var flowstreamid = common.socket.split('/').trim()[3];
+		// The socket URL is <origin>[/$root]/flows/<id>/[?openplatform=...]. A fixed index
+		// silently returns "flows" as soon as CONF.$root adds a path segment, so key off
+		// the "flows" segment the +SOCKET route defines instead.
+		var flowstreamid = (function() {
+			var arr = common.socket.split('?')[0].split('/').trim();
+			var index = arr.lastIndexOf('flows');
+			return index === -1 ? arr[arr.length - 1] : arr[index + 1];
+		})();
 		var init = false;
 		var sourcecache = {};
 		var autosavetimer = null;
@@ -862,6 +870,79 @@
 			return true;
 		};
 
+		// Every node id currently on the canvas (the three reserved design keys are not nodes)
+		var nodeids = function() {
+			var arr = [];
+			for (var key in flow.data) {
+				if (key !== 'paused' && key !== 'groups' && key !== 'tabs')
+					arr.push(key);
+			}
+			return arr;
+		};
+
+		// Hands a set of nodes everything they need to work: the whole dataStream, then each
+		// per-topic payload, then "ready". Used for brand new nodes after a save, and for
+		// every node after a restore/import (which rebuilds them all in the worker, leaving
+		// each one with an empty state).
+		var senddatastream = function(ids) {
+
+			if (!ids || !ids.length)
+				return;
+
+			for (var i = 0; i < ids.length; i++) {
+
+				var id = ids[i];
+
+				if (common.dataStream != null) {
+					SETTER('websocket/send', {
+						TYPE: 'call',
+						id: id,
+						data: { topic: 'dataStream', payload: common.dataStream },
+						callbackid: GUID(10)
+					});
+				}
+
+				if (common.payloads != null) {
+					for (var key in common.payloads) {
+						SETTER('websocket/send', {
+							TYPE: 'call',
+							id: id,
+							data: { topic: 'dataStream/' + key, payload: common.payloads[key] },
+							callbackid: GUID(10)
+						});
+					}
+				}
+
+				SETTER('websocket/send', {
+					TYPE: 'call',
+					id: id,
+					data: { topic: 'ready', payload: null },
+					callbackid: GUID(10)
+				});
+			}
+		};
+
+		// Restoring a backup (or importing) rebuilds every node inside the worker, so they
+		// all come back with an empty state and need the dataStream delivered again.
+		//
+		// The replacement design arrives asynchronously as a flow/design push, and that
+		// message is also echoed after every ordinary save - so we cannot resend on it
+		// unconditionally. Instead arm a one-shot flag for the next flow/design to consume,
+		// with a timer in case that push already landed before this ran, or never comes.
+		var pendingresend = false;
+
+		exports.resenddatastream = function() {
+
+			pendingresend = true;
+
+			setTimeout(function() {
+				if (pendingresend) {
+					pendingresend = false;
+					senddatastream(nodeids());
+				}
+			}, 2500);
+		};
+
 		var persistflow = function(issilent) {
 
 			var model = flow.data;
@@ -923,45 +1004,8 @@
 				}
 
 				setTimeout(function() {
-					if (newlyconnected.length) {
-						for (var i = 0; i < newlyconnected.length; i++) {
-							if (common.dataStream != null) {
-								SETTER('websocket/send', {
-									TYPE: 'call',
-									id: newlyconnected[i],
-									data: {
-										topic: 'dataStream',
-										payload: common.dataStream
-									},
-									callbackid: GUID(10)
-								});
-							}
-							if (common.payloads != null) {
-								for (var key in common.payloads) {
-									var topic = 'dataStream/' + key;
-									var payload = common.payloads[key];
-									SETTER('websocket/send', {
-										TYPE: 'call',
-										id: newlyconnected[i],
-										data: {
-											topic,
-											payload
-										},
-										callbackid: GUID(10)
-									});
-								}
-							}
-							SETTER('websocket/send', {
-								TYPE: 'call',
-								id: newlyconnected[i],
-								data: {
-									topic: 'ready',
-									payload: null,
-								},
-								callbackid: GUID(10)
-							});
-						}
-					}
+
+					senddatastream(newlyconnected);
 
 					var pendingreplay = common.pendingreplay || [];
 					if (pendingreplay.length) {
@@ -1777,6 +1821,16 @@
 
 				case 'flow/design':
 					loadflow(msg.data);
+
+					// Only after a restore/import - see exports.resenddatastream
+					if (pendingresend) {
+						pendingresend = false;
+						// loadflow has replaced flow.data, but the node instances finish
+						// initialising asynchronously, so give them a moment first
+						setTimeout(function() {
+							senddatastream(nodeids());
+						}, 500);
+					}
 					break;
 
 				case 'flow/pause':
@@ -1878,6 +1932,79 @@
 			var isCollapsed = !pluginEl.hclass('flow-fullscreen');
 			var next = !isCollapsed;
 			applyCollapsed(next, true);
+		};
+
+		exports.managebackup = function(el) {
+
+			var opt = {};
+			opt.element = el;
+			opt.items = [];
+
+			opt.items.push({ id: 'create-backup', name: '@(Create Backup)', icon: 'ti ti-save' });
+			opt.items.push({ id: 'manage-backup', name: '@(Manage Backups)', icon: 'ti ti-database-alt' });
+			opt.items.push('-');
+			opt.items.push({ id: 'import', name: '@(Import)', icon: 'ti ti-file-import' });
+			opt.items.push({ id: 'export', name: '@(Export)', icon: 'ti ti-file-export' });
+
+			opt.callback = function(item) {
+
+				switch (item.id) {
+
+					case 'create-backup':
+						// Name + Save only. Lives on common.form2 so the same dialog can
+						// also stack on top of the manage list (see forms/backups.html).
+						// No callback here - there is no open list to refresh.
+						SET('backupform @reset', { id: flowstreamid });
+						SET('common.form2', 'backupform');
+						break;
+
+					case 'manage-backup':
+						// Lists backups with Restore / Delete
+						SET('backupsform @reset', { id: flowstreamid });
+						SET('common.form', 'backupsform');
+						break;
+
+					case 'import':
+						exports.importstate();
+						break;
+
+					case 'export':
+						// Same path as Options > Download (see exports.options)
+						SETTER('websocket/send', { TYPE: 'export', callback: ERROR(function(response) {
+							delete response.data.origin;
+							SETTER('filesaver/save', flow.head.name + '.json', JSON.stringify(response.data, null, '\t'), 'json');
+						})});
+						break;
+				}
+			};
+
+			SETTER('menu/show', opt);
+		};
+
+		// Replaces the current FlowStream state with the contents of a .json file.
+		// The server keeps this flowstream's identity and only takes the design,
+		// components, variables and sources from the payload.
+		exports.importstate = function() {
+			SETTER('filereader/open', { accept: '.json,application/json', multiple: false, callback: function(file) {
+
+				var data = (file.body || '').parseJSON(true);
+
+				// Same shape check the flows list uses before clipboard_import
+				if (!data || !data.components || !data.design) {
+					SETTER('notify/warning', '@(Invalid FlowStream file)');
+					return;
+				}
+
+				SETTER('approve/show', '@(Are you sure you want to replace the current state of this FlowStream with "{0}"? The current state will be lost.)'.format(file.filename), '"ti ti-file-import" @(Import)', function() {
+					TAPI('backup_import @showloading ERROR', { id: flowstreamid, data: file.body }, function() {
+						// @showloading needs an explicit counterpart on the success path
+						SETTER('loading/hide');
+						// Every node was rebuilt, so re-deliver the dataStream to all of them
+						exports.resenddatastream();
+						SETTER('notify/success', '@(The FlowStream has been imported.)');
+					});
+				});
+			}});
 		};
 
 		ON('online', function(is) {

@@ -29,6 +29,16 @@ const DB_FILE = 'database.json';
 const DEFAULT_COMPONENTS_FILE = PATH.root('defaultComponents.json');
 const BACKUP_KEEP = 10;
 
+// Manual (user-triggered) snapshots are prefixed so prune() can leave them alone: they
+// are deliberate, so nothing auto-deletes them. Automatic backups keep the old
+// <id>_yyyyMMddHHmm.bk naming and are still capped by CONF.backup_keep.
+const MANUAL_PREFIX = 'manual_';
+
+// Filenames arrive from the client (Backup/restore, Backup/remove). Anything outside
+// this shape - or that escapes the flowstream's own backup directory - is rejected.
+const REG_BACKUP = /^[A-Za-z0-9_.-]+\.bk$/;
+const REG_LABEL = /[^A-Za-z0-9-]/g;
+
 // Coalesces bursts of dirty marks. The library already debounces flow.save() by 5s
 // per flowstream, this just merges the marks that land in the same tick.
 const DEBOUNCE = 750;
@@ -148,8 +158,9 @@ function prune(dir, callback) {
 		if (err || !files)
 			return callback();
 
-		// Names are <id>_yyyyMMddHHmm.bk so a lexicographic sort is chronological
-		var arr = files.filter(n => n.endsWith('.bk')).sort();
+		// Names are <id>_yyyyMMddHHmm.bk so a lexicographic sort is chronological.
+		// Manual snapshots are exempt - the user asked for those explicitly.
+		var arr = files.filter(n => n.endsWith('.bk') && !n.startsWith(MANUAL_PREFIX)).sort();
 		if (arr.length <= keep)
 			return callback();
 
@@ -270,6 +281,180 @@ exports.removeflow = function(id) {
 	delete pending[id];
 	F.Fs.unlink(flowfile(id), NOOP);
 	F.Fs.rm(PATH.join(backupdir(), id), { recursive: true, force: true }, NOOP);
+};
+
+// --- Manual backups -------------------------------------------------------------
+// Everything below is driven by schemas/backup.js. The private helpers above
+// (backupdir/serialize/atomic/prune) stay private on purpose; these are the only
+// supported entry points.
+
+// Resolves <backupdir>/<id>/<name> and refuses anything that escapes it. Returns
+// null when the name is not a plain .bk filename or the path breaks out.
+function backupfile(id, name) {
+
+	if (!id || !name || !REG_BACKUP.test(name))
+		return null;
+
+	var dir = PATH.join(backupdir(), id);
+	var filename = PATH.join(dir, name);
+
+	// Belt and braces: REG_BACKUP already forbids "/", but resolve and re-check so a
+	// future loosening of the regex cannot turn into arbitrary file access
+	if (F.Path.resolve(filename).indexOf(F.Path.resolve(dir) + F.Path.sep) !== 0)
+		return null;
+
+	return filename;
+}
+
+// Snapshots the flowstream's LIVE state, pulled from the running worker rather than
+// from Flow.db[id] or flows/<id>.json - both of those lag the designer by the worker's
+// 5s save debounce plus this module's own DEBOUNCE.
+exports.snapshot = function(id, label, callback) {
+
+	var flow = Flow.db[id];
+	if (!flow || id === 'variables')
+		return callback('404');
+
+	var instance = Flow.instances[id];
+
+	// Nothing running (e.g. a paused flowstream): the parent's copy is all there is
+	if (!instance)
+		return writesnapshot(id, flow, label, callback);
+
+	// The design lives inside the worker. Flow.db[id] is only refreshed when the worker
+	// flushes its own 5s save debounce (stream/save in total5/flow-flowstream.js), so a
+	// node added seconds ago is not in Flow.db yet. Ask the instance for its live state.
+	var done = false;
+
+	var finish = function(data) {
+		if (done)
+			return;
+		done = true;
+		writesnapshot(id, data, label, callback);
+	};
+
+	// If the worker never answers, still write what the parent knows rather than
+	// leaving the request hanging - instance.export() has no timeout of its own
+	var timeout = setTimeout(() => finish(flow), 5000);
+
+	instance.export(function(err, data) {
+		clearTimeout(timeout);
+		// export2() omits variables2/directory/unixsocket, so layer it over the parent
+		// copy: exported values win, nothing already known is lost
+		finish(data && data.constructor === Object ? Object.assign({}, flow, data) : flow);
+	});
+};
+
+function writesnapshot(id, flow, label, callback) {
+
+	var body;
+
+	try {
+		body = serialize(flow);
+	} catch (e) {
+		ERROR('FlowDB.snapshot')(e);
+		return callback('serialize');
+	}
+
+	label = (label || '').replace(REG_LABEL, '').substring(0, 40);
+
+	var name = MANUAL_PREFIX + (new Date()).format('yyyyMMddHHmmss') + (label ? ('__' + label) : '') + '.bk';
+	var dir = PATH.join(backupdir(), id);
+
+	F.Fs.mkdir(dir, { recursive: true }, function(err) {
+
+		if (err) {
+			ERROR('FlowDB.snapshot')(err);
+			return callback('mkdir');
+		}
+
+		// Reuses the tmp+rename write, so a reader never sees a partial snapshot.
+		// Deliberately does not prune - manual snapshots are never auto-deleted.
+		atomic(PATH.join(dir, name), body, () => callback(null, name));
+	});
+}
+
+// Dates come from stat.mtime rather than the filename, so legacy automatic
+// <id>_yyyyMMddHHmm.bk files list correctly too. Newest first.
+exports.listbackups = function(id, callback) {
+
+	var dir = PATH.join(backupdir(), id);
+
+	F.Fs.readdir(dir, function(err, files) {
+
+		// No directory yet just means no backups
+		if (err || !files)
+			return callback(null, []);
+
+		var arr = [];
+
+		files.filter(n => n.endsWith('.bk')).wait(function(name, next) {
+
+			var filename = PATH.join(dir, name);
+
+			F.Fs.stat(filename, function(err, stat) {
+
+				if (err || !stat.isFile())
+					return next();
+
+				var item = {};
+				item.name = name;
+				item.size = stat.size;
+				item.dtcreated = stat.mtime;
+				item.manual = name.startsWith(MANUAL_PREFIX);
+
+				var index = name.indexOf('__');
+				item.label = index === -1 ? '' : name.substring(index + 2, name.length - 3);
+
+				// Node count needs the payload. These are small (components are
+				// stripped) and this only runs when the user opens the dialog.
+				F.Fs.readFile(filename, 'utf8', function(err, body) {
+					var flow = body ? body.parseJSON(true) : null;
+					item.nodes = flow ? MODS.limits.countnodes(flow.design) : 0;
+					item.invalid = !flow;
+					arr.push(item);
+					next();
+				});
+			});
+
+		}, function() {
+			// Newest first. Explicit comparator: quicksort('dtcreated', false) does not
+			// order Date values descending.
+			arr.sort((a, b) => b.dtcreated - a.dtcreated);
+			callback(null, arr);
+		});
+
+	});
+};
+
+exports.readbackup = function(id, name, callback) {
+
+	var filename = backupfile(id, name);
+	if (!filename)
+		return callback('invalid');
+
+	F.Fs.readFile(filename, 'utf8', function(err, body) {
+
+		if (err)
+			return callback('404');
+
+		var flow = body ? body.parseJSON(true) : null;
+		if (!flow || flow.constructor !== Object)
+			return callback('invalid');
+
+		callback(null, flow);
+	});
+};
+
+exports.removebackup = function(id, name, callback) {
+
+	var filename = backupfile(id, name);
+	if (!filename)
+		return callback('invalid');
+
+	F.Fs.unlink(filename, function(err) {
+		callback(err ? '404' : null);
+	});
 };
 
 // One-shot split of the legacy monolith. Idempotent: skipped once flows/ has content.

@@ -1,0 +1,37 @@
+<ui-component name="miniform" path="common.form2" config="if:~PATH~;icon:ti ti-save;title:@(Create backup);autofocus:true;submit:?/submit;enter:1;width:450;zindex:20;closeesc:1" class="hidden" plugin="~PATH~">
+	<div class="padding">
+		<ui-component name="input" path="?.label" config="placeholder:@(Optional, e.g. before-rewiring);maxlength:40" default="''">@(Name)</ui-component>
+		<div class="help">@(Letters, numbers and dashes only. Leave it empty to name the backup by date only.)</div>
+	</div>
+	<nav>
+		<button name="submit"><i class="ti ti-check-circle"></i>@(Save)</button>
+		<button name="cancel">@(Cancel)</button>
+	</nav>
+</ui-component>
+
+<script>
+
+	PLUGIN(function(exports) {
+
+		// Opened from forms/backups.html, which passes { id, callback } so the list
+		// behind this dialog can refresh once the backup exists
+		exports.submit = function(hide) {
+
+			var model = exports.model;
+
+			TAPI('backup_create @showloading ERROR', { id: model.id, label: model.label || '' }, function() {
+
+				// @showloading has no automatic counterpart - only an @hideloading flag
+				// or an explicit hide clears it. The ERROR handler in views/designer.html
+				// covers the failure path, so the success path must hide it itself.
+				SETTER('loading/hide');
+
+				SETTER('notify/success', '@(The backup has been created.)');
+				model.callback && model.callback();
+				hide && hide();
+			});
+		};
+
+	});
+
+</script>

@@ -36,6 +36,13 @@ exports.install = function() {
 	ROUTE('+API     ?    -clipboard_export/id              --> Clipboard/export');
 	ROUTE('+API     ?    +clipboard_import    <10MB <300s  --> Clipboard/import');
 
+	// Backup (per FlowStream)
+	ROUTE('+API     ?    -backup_list/{id}                 --> Backup/list');
+	ROUTE('+API     ?    +backup_create                    --> Backup/create');
+	ROUTE('+API     ?    +backup_restore      <300s        --> Backup/restore');
+	ROUTE('+API     ?    +backup_remove                    --> Backup/remove');
+	ROUTE('+API     ?    +backup_import       <10MB <300s  --> Backup/import');
+
 	// Socket
 	ROUTE('+SOCKET  /flows/{id}/ <8MB', socket); // max. 8 MB
 };
