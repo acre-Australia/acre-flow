@@ -29,6 +29,11 @@ const DB_FILE = 'database.json';
 const DEFAULT_COMPONENTS_FILE = PATH.root('defaultComponents.json');
 const BACKUP_KEEP = 10;
 
+// Cap on manual backups per flowstream (CONF.backup_manual_max, 0 = unlimited). Unlike
+// CONF.backup_keep this does NOT prune - reaching it blocks Backup/create instead, so a
+// deliberate snapshot is never silently deleted to make room.
+const MANUAL_MAX = 10;
+
 // Manual (user-triggered) snapshots are prefixed so prune() can leave them alone: they
 // are deliberate, so nothing auto-deletes them. Automatic backups keep the old
 // <id>_yyyyMMddHHmm.bk naming and are still capped by CONF.backup_keep.
@@ -424,6 +429,22 @@ exports.listbackups = function(id, callback) {
 			callback(null, arr);
 		});
 
+	});
+};
+
+// Resolved manual-backup cap. 0 means unlimited; unset falls back to MANUAL_MAX.
+// CONF values arrive as strings from the config file, so always coerce.
+exports.manualmax = function() {
+	var max = CONF.backup_manual_max == null || CONF.backup_manual_max === '' ? MANUAL_MAX : +CONF.backup_manual_max;
+	return max > 0 ? max : 0;
+};
+
+// Cheap count - just names, no file reads (listbackups parses every file to count nodes)
+exports.countmanual = function(id, callback) {
+	F.Fs.readdir(PATH.join(backupdir(), id), function(err, files) {
+		if (err || !files)
+			return callback(null, 0);
+		callback(null, files.filter(n => n.endsWith('.bk') && n.startsWith(MANUAL_PREFIX)).length);
 	});
 };
 

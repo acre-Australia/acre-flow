@@ -140,19 +140,19 @@
 
       TAPI("backup_list/{0} ERROR".format(flowstreamid), function (response) {
         // dtcreated arrives as an ISO string over JSON
-        for (var m of response)
+        for (var m of response.items)
           m.date = new Date(m.dtcreated).format("yyyy-MM-dd HH:mm:ss");
 
         exports.scope();
-        exports.set("items @hideloading", response);
+        exports.set("items @hideloading", response.items);
       });
     };
 
-    // Opens the separate create dialog on common.form2, so this list stays open
-    // underneath and refreshes via the callback
+    // Delegates to the flow plugin, which owns the limit check and opens the separate
+    // create dialog on common.form2 - so this list stays open underneath and refreshes
+    // through the callback once the backup exists
     exports.create = function () {
-      SET("backupform @reset", { id: id(), callback: exports.refresh });
-      SET("common.form2", "backupform");
+      EXEC("flow/createbackup", exports.refresh);
     };
 
     exports.restore = function (el) {

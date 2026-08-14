@@ -1951,11 +1951,8 @@
 				switch (item.id) {
 
 					case 'create-backup':
-						// Name + Save only. Lives on common.form2 so the same dialog can
-						// also stack on top of the manage list (see forms/backups.html).
-						// No callback here - there is no open list to refresh.
-						SET('backupform @reset', { id: flowstreamid });
-						SET('common.form2', 'backupform');
+						// No callback - there is no open list to refresh
+						exports.createbackup();
 						break;
 
 					case 'manage-backup':
@@ -1979,6 +1976,26 @@
 			};
 
 			SETTER('menu/show', opt);
+		};
+
+		// Opens the create-backup dialog, but only when this FlowStream is under the manual
+		// backup limit. Backup/create enforces the same cap server-side; this is purely so
+		// the user gets the message on click instead of after typing a name - the same split
+		// as exceedsnodes() vs the server's flowstream_maxnodes check.
+		// The limit comes from the list response rather than a client-side copy, so it can
+		// never disagree with what the server enforces.
+		exports.createbackup = function(callback) {
+
+			TAPI('backup_list/{0} ERROR'.format(flowstreamid), function(response) {
+
+				if (!response.canadd) {
+					SETTER('message/warning', '@(This FlowStream already has the maximum of {0} backups. Remove one before creating another.)'.format(response.max));
+					return;
+				}
+
+				SET('backupform @reset', { id: flowstreamid, callback: callback });
+				SET('common.form2', 'backupform');
+			});
 		};
 
 		// Replaces the current FlowStream state with the contents of a .json file.

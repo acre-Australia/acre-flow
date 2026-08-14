@@ -89,7 +89,15 @@ NEWACTION('Backup/list', {
 		}
 
 		MODS.flowdb.listbackups(id, function(err, items) {
-			$.callback(items || []);
+
+			items = items || [];
+
+			var max = MODS.flowdb.manualmax();
+			var manual = items.filter(m => m.manual).length;
+
+			// The limit travels with the list so the UI never has its own copy of it to
+			// drift out of sync with what Backup/create actually enforces
+			$.callback({ items: items, max: max, manual: manual, canadd: !max || manual < max });
 		});
 	}
 });
@@ -105,15 +113,28 @@ NEWACTION('Backup/create', {
 			return;
 		}
 
-		MODS.flowdb.snapshot(model.id, model.label, function(err, name) {
+		// Authoritative check. The UI checks too (for a message before the dialog opens),
+		// but this is what actually holds - and it blocks rather than pruning, so an
+		// existing snapshot is never dropped to make room for a new one.
+		MODS.flowdb.countmanual(model.id, function(err, count) {
 
-			if (err) {
-				$.invalid('@(The backup could not be created)');
+			var max = MODS.flowdb.manualmax();
+
+			if (max && count >= max) {
+				$.invalid('@(This FlowStream already has the maximum of {0} backups. Remove one before creating another.)'.format(max));
 				return;
 			}
 
-			$.audit(item.name + ' / ' + name);
-			$.callback({ success: true, value: name });
+			MODS.flowdb.snapshot(model.id, model.label, function(err, name) {
+
+				if (err) {
+					$.invalid('@(The backup could not be created)');
+					return;
+				}
+
+				$.audit(item.name + ' / ' + name);
+				$.callback({ success: true, value: name });
+			});
 		});
 	}
 });
