@@ -1,27 +1,5 @@
 const Fields = 'id,name:SafeString,author,version,icon:Icon,reference,group,url,cloning:Boolean,color:Color,readme,memory:Number,proxypath'.toJSONSchema();
 
-const DEFAULT_COMPONENTS_FILE = PATH.root('defaultComponents.json');
-let DEFAULT_COMPONENTS;
-
-function loaddefaultcomponents() {
-	if (DEFAULT_COMPONENTS)
-		return DEFAULT_COMPONENTS;
-
-	try {
-		var body = F.Fs.readFileSync(DEFAULT_COMPONENTS_FILE, 'utf8');
-		var parsed = body ? body.toString('utf8').parseJSON(true) : null;
-		if (parsed && parsed.components && parsed.components.constructor === Object)
-			DEFAULT_COMPONENTS = parsed.components;
-		else
-			DEFAULT_COMPONENTS = {};
-	} catch (e) {
-		DEFAULT_COMPONENTS = {};
-		F.error('Failed to load default components from ' + DEFAULT_COMPONENTS_FILE, e);
-	}
-
-	return DEFAULT_COMPONENTS;
-}
-
 NEWACTION('Streams/query', {
 	name: 'Query streams',
 	action: function($) {
@@ -103,7 +81,7 @@ NEWACTION('Streams/save', {
 
 			model.id = 'f' + UID();
 			model.design = {};
-			model.components = CLONE(loaddefaultcomponents());
+			model.components = MODS.flowdb.mergedefaults();
 			model.variables = {};
 			model.sources = {};
 			model.dtcreated = NOW;
@@ -119,6 +97,9 @@ NEWACTION('Streams/save', {
 			TRANSFORM('flowstream.create', model, function(err, model) {
 				Flow.db[model.id] = model;
 				Flow.load(model, ERROR('FlowStream.init'));
+				// Emitted here, not below: the write must not be queued before
+				// Flow.db has the entry, or it would find nothing to persist
+				Flow.emit('save', { id: model.id });
 			});
 
 		} else {
@@ -142,6 +123,7 @@ NEWACTION('Streams/save', {
 
 				TRANSFORM('flowstream.update', item, function(err, item) {
 					Flow.reload(item);
+					Flow.emit('save', { id: item.id });
 				});
 
 			} else {
@@ -152,8 +134,6 @@ NEWACTION('Streams/save', {
 
 		$.audit();
 		$.success();
-
-		Flow.emit('save');
 	}
 });
 
@@ -174,8 +154,8 @@ NEWACTION('Streams/remove', {
 				path = PATH.root(CONF.directory);
 
 			F.Fs.rm(PATH.join(path, id), { recursive: true, force: true }, NOOP);
+			// Emits "remove", which unlinks flows/<id>.json (see definitions/flowstream.js)
 			Flow.remove(id);
-			Flow.emit('save');
 
 			$.audit(item.name);
 			$.success();

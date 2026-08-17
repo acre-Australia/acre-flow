@@ -61,7 +61,9 @@
 	<ui-component name="importer" path="common.form" config="if:versionform;url:@{#}/forms/version.html"></ui-component>
 	<ui-component name="importer" path="common.form" config="if:variablesform;url:@{#}/forms/variables.html"></ui-component>
 	<ui-component name="importer" path="common.form" config="if:importform;url:@{#}/forms/import.html"></ui-component>
+	<ui-component name="importer" path="common.form" config="if:backupsform;url:@{#}/forms/backups.html"></ui-component>
 	<ui-component name="importer" path="common.form2" config="if:sourceform;url:@{#}/forms/source.html"></ui-component>
+	<ui-component name="importer" path="common.form2" config="if:backupform;url:@{#}/forms/backup.html"></ui-component>
 
 	<script>
 
@@ -69,6 +71,13 @@
 
 		DEF.fallback = '@{#}/cdn/j-{0}.html';
 		DEF.versionhtml = '@{Flow.version}';
+
+		// The designer talks to the flow over a websocket, but the backup actions live on
+		// the REST API (the websocket TYPEs are handled inside the total5 library). TAPI
+		// falls back to the websocket transport unless DEF.api is set, so set it here the
+		// same way views/index.html does. The designer iframe URL already carries
+		// &openplatform=... in OpenPlatform mode (see views/index.html iframe src).
+		DEF.api = '@{CONF.$api}' + (NAV.query.openplatform ? ('?openplatform=' + encodeURIComponent(NAV.query.openplatform)) : '');
 
 		ENVIRONMENT('designer');
 

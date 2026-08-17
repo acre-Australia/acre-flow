@@ -1,0 +1,201 @@
+<style>
+  .CLASS .item {
+    border-bottom: 1px solid #e0e0e0;
+    padding: 8px 10px;
+    font-size: 12px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+  }
+  .CLASS .item:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  /* min-width:0 lets a long label ellipsis instead of pushing the buttons out */
+  .CLASS .item .info {
+    min-width: 0;
+  }
+  .CLASS .item .controls {
+			float: unset;
+    margin: 0;
+    flex-shrink: 0;
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .CLASS .item .controls button {
+    width: auto;
+    min-width: 22px;
+    margin: 0;
+  }
+	.CLASS .item .controls button.restore-button {
+		display: inline-flex;
+    align-items: center;
+    gap: 5px;
+	}
+  .CLASS .item .name {
+    font-weight: bold;
+  }
+  .CLASS .item .name .monospace {
+    font-weight: normal;
+    color: #777;
+    font-size: 11px;
+  }
+  .CLASS .item .meta {
+    color: #999;
+    font-size: 11px;
+  }
+  .CLASS .item .invalid {
+    color: #e73323;
+  }
+  .ui-dark .CLASS .item {
+    border-bottom-color: #444;
+  }
+  .ui-dark .CLASS .item:hover {
+    background-color: rgba(200, 200, 200, 0.04);
+  }
+</style>
+
+<ui-component
+  name="box"
+  path="common.form"
+  config="if:~PATH~;icon:ti ti-database-alt;title:@(Manage backups);reload:?/reload;scrollbar:0;width:750;closeesc:1"
+  class="hidden CLASS"
+  plugin="CLASS"
+>
+  <!-- First child, so box() moves this into the title bar and its height is already
+       accounted for by the title measurement (same as forms/components.html) -->
+  <nav>
+    <button class="exec" data-exec="?/create">
+      <i class="ti ti-plus-circle green"></i>@(Create backup)
+    </button>
+  </nav>
+
+  <!-- The viewbox is the only child of the scroll body, so parent:auto gives it the
+       full height and margin:0 is exact. Creating backups lives in forms/backup.html. -->
+  <ui-component
+    name="viewbox"
+    path="common.form"
+    config="parent:auto;margin:0;scrollbar:1;scrollbarshadow:1"
+    class="invisible"
+  >
+    <ui-component name="empty" path="?.items" config="parent:auto" class="invisible">
+      <script type="text/html">
+        @(This FlowStream has no backups yet)
+      </script>
+
+      <ui-bind path="?.items" config="template" class="block">
+        <script type="text/html">
+          {{ foreach m in value }}
+          <div class="item">
+            <div class="info">
+              <div class="name">
+                {{ if m.label }}{{ m.label }}{{ else }}@(Snapshot){{ fi }}{{ if
+                !m.manual }} <span class="monospace">@(automatic)</span>{{ fi }}
+              </div>
+              <div class="meta">
+                {{ m.date }} &middot; {{ m.size | filesize }} &middot; {{
+                m.nodes }} @(nodes){{ if m.invalid }} &middot;
+                <span class="invalid">@(unreadable)</span>{{ fi }}
+              </div>
+            </div>
+            <div class="controls">
+              <button class="exec restore-button" data-exec="?/restore" data-id="{{ m.name }}">
+                <i class="ti ti-undo"></i>@(Restore)
+              </button>
+              <button
+                class="exec delete-button"
+                data-exec="?/remove"
+                data-id="{{ m.name }}"
+                title="@(Remove)"
+              >
+                <i class="ti ti-trash red"></i>
+              </button>
+            </div>
+          </div>
+          {{ end }}
+        </script>
+      </ui-bind>
+    </ui-component>
+  </ui-component>
+
+  <nav>
+    <button name="cancel" style="width: 100%">@(Close)</button>
+  </nav>
+</ui-component>
+
+<script>
+  PLUGIN(function (exports) {
+    // The flowstream id is passed in by parts/flow.html when it opens this form
+    function id() {
+      return exports.model ? exports.model.id : null;
+    }
+
+    exports.reload = function () {
+      exports.refresh();
+    };
+
+    exports.refresh = function () {
+      var flowstreamid = id();
+      if (!flowstreamid) return;
+
+      TAPI("backup_list/{0} ERROR".format(flowstreamid), function (response) {
+        // dtcreated arrives as an ISO string over JSON
+        for (var m of response.items)
+          m.date = new Date(m.dtcreated).format("yyyy-MM-dd HH:mm:ss");
+
+        exports.scope();
+        exports.set("items @hideloading", response.items);
+      });
+    };
+
+    // Delegates to the flow plugin, which owns the limit check and opens the separate
+    // create dialog on common.form2 - so this list stays open underneath and refreshes
+    // through the callback once the backup exists
+    exports.create = function () {
+      EXEC("flow/createbackup", exports.refresh);
+    };
+
+    exports.restore = function (el) {
+      var name = ATTRD(el);
+
+      SETTER(
+        "approve/show",
+        "@(Are you sure you want to replace the current state of this FlowStream with this backup? The current state will be lost.)",
+        '"ti ti-undo" @(Restore)',
+        function () {
+          TAPI(
+            "backup_restore @showloading ERROR",
+            { id: id(), name: name },
+            function () {
+              // The restore rebuilt every node in the worker, so each one starts with
+              // an empty state - the designer has to re-deliver the dataStream
+              EXEC("flow/resenddatastream");
+              SETTER("notify/success", "@(The FlowStream has been restored.)");
+              exports.refresh();
+            },
+          );
+        },
+      );
+    };
+
+    exports.remove = function (el) {
+      var name = ATTRD(el);
+
+      SETTER(
+        "approve/show",
+        "@(Are you sure you want to remove this backup?)",
+        '"ti ti-trash" @(Remove)',
+        function () {
+          TAPI(
+            "backup_remove @showloading ERROR",
+            { id: id(), name: name },
+            function () {
+              SETTER("notify/success", "@(The backup has been removed.)");
+              exports.refresh();
+            },
+          );
+        },
+      );
+    };
+  });
+</script>
