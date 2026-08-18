@@ -181,6 +181,10 @@ internalstats.node = F.version_node;
 internalstats.total = F.version;
 internalstats.version = Flow.version;
 
+// Build versions injected via .env (see index.js).
+internalstats.flowversion = process.env.ACREFLOW_COMMIT_HASH || '-';
+internalstats.componentsversion = process.env.ACREFLOW_COMPONENTS_COMMIT_HASH || '-';
+
 NEWACTION('Streams/stats', {
 	name: 'Read stats',
 	action: function($) {

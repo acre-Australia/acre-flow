@@ -86,6 +86,8 @@
 		common.components2 = '@{PREF.components2}';
 		common.language = '@{controller.language}';
 		common.maxnodes = +'@{CONF.flowstream_maxnodes}' || 0; // 0 = unlimited
+		common.flowversion = '@{CONF.acreflow_commit_hash}' || '-';
+		common.componentsversion = '@{CONF.acreflow_components_commit_hash}' || '-';
 		common.page = '';
 		common.windows = [];
 
