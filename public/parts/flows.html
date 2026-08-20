@@ -77,6 +77,8 @@
 					<span><b>{{ value.pending | format(0) }}</b>@(Pending)</span>
 					<span><b>{{ value.mm | format(0) }}</b>@(Per minute)</span>
 					<span><i class="ti ti-user green mr5"></i><b>{{ value.online | format(0) }}</b>@(Online clients)</span>
+					<span title="@(Acre Flow Version)"><b>{{ value.flowversion }}</b>@(Flow Version)</span>
+					<span title="@(Acre Flow Components Version)"><b>{{ value.componentsversion }}</b>@(Components Version)</span>
 					<span class="center" title="FlowStream: {{ value.version }}, Total.js: {{ value.total }}, Node.js: {{ value.node }}">FlowStream v{{ value.version }} | Total.js: v{{ value.total }}</span>
 				</script>
 			</ui-bind>

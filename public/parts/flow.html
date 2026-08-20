@@ -168,6 +168,12 @@
 				<div class="realtime" title="@(Memory usage)">
 					<i class="ti ti-microchip"></i>@(Memory): <ui-bind class="gray" path="?.stats.memory" config="text:Thelpers.filesize(value||0)"></ui-bind>
 				</div>
+				<div class="realtime" title="@(Acre Flow Version)">
+					<i class="ti ti-microchip"></i>@(Flow Version): <ui-bind class="gray" path="common.flowversion" config="text"></ui-bind>
+				</div>
+				<div class="realtime" title="@(Acre Flow Components Version)">
+					<i class="ti ti-microchip"></i>@(Components Version): <ui-bind class="gray" path="common.componentsversion" config="text"></ui-bind>
+				</div>
 			</div>
 		</section>
 

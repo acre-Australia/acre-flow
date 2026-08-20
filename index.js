@@ -23,6 +23,13 @@ if (process.env.COOKIE_NAME)
 if (process.env.COMPONENTS)
 	secureConfig.components = process.env.COMPONENTS;
 
+// Build versions injected by CI/CD, rendered into the designer (see views/designer.html).
+if (process.env.ACREFLOW_COMMIT_HASH)
+	secureConfig.acreflow_commit_hash = process.env.ACREFLOW_COMMIT_HASH;
+
+if (process.env.ACREFLOW_COMPONENTS_COMMIT_HASH)
+	secureConfig.acreflow_components_commit_hash = process.env.ACREFLOW_COMPONENTS_COMMIT_HASH;
+
 if (Object.keys(secureConfig).length)
 	options.config = secureConfig;
 
