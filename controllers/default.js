@@ -1,6 +1,6 @@
 exports.install = function() {
 	ROUTE('+GET /', index);
-	ROUTE('+GET /designer/');
+	ROUTE('+GET /designer/', designer);
 	ROUTE('+GET /open/{reference}/', openflow);
 	ROUTE('GET /sso/', sso);
 	ROUTE('POST /sso/', sso);
@@ -64,6 +64,13 @@ function index($) {
 	}
 
 	$.view('index', plugins);
+}
+
+// The designer hides the source-editing context-menu actions for components that come
+// from defaultComponents.json (they are supplied by the deployment, not by users), so it
+// needs their ids. See public/parts/flow.html.
+function designer($) {
+	$.view('designer', Object.keys(MODS.flowdb.loaddefaults()));
 }
 
 function sso($) {

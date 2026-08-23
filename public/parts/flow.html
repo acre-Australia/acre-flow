@@ -258,6 +258,13 @@
 	PLUGIN('flow', function(exports) {
 
 		var TYPES = { pub: 1, sub: 1, call: 1 };
+
+		// Components supplied by the deployment (defaultComponents.json, see the id list in
+		// views/designer.html). Their source is managed outside the designer, so the actions
+		// that edit, duplicate, export or delete it are hidden for them.
+		function isdefaultcomponent(component) {
+			return !!(component && (common.defaultcomponents || EMPTYARRAY).indexOf(component.id) !== -1);
+		}
 		var initialized_settings = {};
 		var checksums = {};
 		var settings_current;
@@ -488,7 +495,7 @@
 						opt.items.push('-');
 					}
 
-					if (!meta.readonly) {
+					if (!meta.readonly && !isdefaultcomponent(component)) {
 						opt.items.push({ id: 'clone', name: '@(Clone)', icon: 'ti ti-clone' });
 						single && opt.items.push({ id: 'edit', name: '@(Edit)', icon: 'ti ti-laptop-code' });
 						opt.items.push({ id: 'exportcomponents', name: '@(Copy)', icon: 'ti ti-copy' });
@@ -2065,7 +2072,7 @@
 			if (meta.secret)
 				return;
 
-			if (!meta.readonly && !TYPES[component.type]) {
+			if (!meta.readonly && !TYPES[component.type] && !isdefaultcomponent(component)) {
 				opt.items.push({ id: 'edit', name: '@(Edit)', icon: 'ti ti-laptop-code' });
 				opt.items.push({ id: 'clone', name: '@(Clone)', icon: 'ti ti-clone' });
 				opt.items.push({ id: 'copy2', name: '@(Copy source-code)', icon: 'ti ti-copy' });
@@ -2073,7 +2080,7 @@
 				opt.items.push({ id: 'publish', name: '@(Publish to the community)', icon: 'ti ti-upload' });
 			}
 
-			if (!TYPES[component.type] && (!meta || meta.protected !== true)) {
+			if (!TYPES[component.type] && (!meta || meta.protected !== true) && !isdefaultcomponent(component)) {
 				opt.items.push('-');
 				opt.items.push({ id: 'remove', name: '@(Remove)', icon: 'ti ti-remove red' });
 			}
