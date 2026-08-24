@@ -10,7 +10,7 @@
 	<meta name="robots" content="all,follow" />
 	@{import('spa.min@19.css', 'spa.min@19.js')}
 	<script src="@{REPO.ui}"></script>
-	@{import('meta', 'head', 'default.css + editor.min@1.css + editor.css', 'filesaver.min.js + editor.min@1.js + uibuilder.min@1.js + editor.js + func.js', 'favicon.ico')}
+	@{import('meta', 'head', 'default.css + loading.css + editor.min@1.css + editor.css', 'filesaver.min.js + editor.min@1.js + uibuilder.min@1.js + editor.js + func.js', 'favicon.ico')}
 </head>
 <body@{if PREF.darkmode} class="ui-dark"@{fi}>
 
@@ -36,7 +36,7 @@
 	<ui-component name="edit"></ui-component>
 	<ui-component name="paste"></ui-component>
 	<ui-component name="shortcuts"></ui-component>
-	<ui-component name="loading" config="style:2"></ui-component>
+	<ui-component name="loading" config="style:1"></ui-component>
 	<ui-component name="markdown" config="highlight:false;charts:false"></ui-component>
 	<ui-component name="errorhandler"></ui-component>
 	<ui-component name="hashchange"></ui-component>
@@ -51,7 +51,7 @@
 		<header>
 			<ui-bind path="common.env" config="template" title="@(Environment)" class="env">
 				<script type="text/html">
-					<span class="badge badge-medium badge-{{ if value === 'dev' }}red{{ else if value === 'test' }}orange{{ else }}green{{ fi }}">{{ value }}</span>
+					{{ if value !== 'prod' }}<span class="badge badge-medium badge-{{ if value === 'dev' }}red{{ else if value === 'test' }}orange{{ else }}green{{ fi }}">{{ value }}</span>{{ fi }}
 				</script>
 			</ui-bind>
 
@@ -130,6 +130,9 @@
 
 		DEF.fallback = '@{#}/cdn/j-{0}.html';
 		DEF.versionhtml = '@{Flow.version}';
+
+		// Brand colour for dynamically generated UI (must match --color in the stylesheets)
+		DEF.color = '#4d2847';
 
 		// Due to plugins
 		W.BREADCRUMB = { add: NOOP };
@@ -454,8 +457,7 @@
 				item.name = flow.name;
 				item.html = ('<iframe src="' + common.designer + '?darkmode={1}&socket={2}&components={3}&language={4}" scrolling="no" frameborder="0" class="iflowstream" style="width:{5}px"></iframe>').format(id, $('body').hclass('ui-dark') ? '1' : '0', encodeURIComponent(url), encodeURIComponent(common.components || '') + common.openplatform ? ('&' + common.openplatform.substring(1)) : '', common.language, WW - model.appmenuwidth);
 				item.focus = 'common/focusiframe';
-				EXEC('-loading/show');
-				EXEC('-loading/hide', 2000);
+				// no loading indicator here: the designer iframe shows its own while it boots
 				exports.push('tabs', item);
 			};
 
@@ -513,7 +515,6 @@
 					opt.items.push({ id: 'restart', name: '@(Restart)', icon: 'ti ti-sync' });
 
 				if (user.sa || user.permissions.includes('remove')) {
-					opt.items.push({ id: 'publish', name: '@(Publish to the community)', icon: 'ti ti-upload' });
 					opt.items.push('-');
 					opt.items.push({ id: 'remove', name: '@(Remove)', icon: 'ti ti-remove red' });
 				}

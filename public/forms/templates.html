@@ -35,7 +35,7 @@
 									{{ foreach m in n.items }}
 									<figure data-search="{{ m.name }} {{ m.author }}" class="exec{{ if m.community }} community{{ fi }}" data-id="{{ m.id }}" data-name="{{ m.name }}" data-url="{{ m.url }}" data-exec="?/install">
 										<section title="{{ m.name }}">
-											<div class="icon"><span class="icon" style="background-color:{{ m.color | empty('#4285F4') }}"><i class="{{ m.icon }}"></i></span></div>
+											<div class="icon"><span class="icon" style="background-color:{{ m.color | empty('#4d2847') }}"><i class="{{ m.icon }}"></i></span></div>
 											<div class="text">
 												<div class="header"><span class="name hellip">{{ m.name }}</span><span class="exec readme" data-exec="?/readme" data-prevent="true">@(Read me)</span></div>
 												<div class="author hellip gray">{{ m.author }}</div>

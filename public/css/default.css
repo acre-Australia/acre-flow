@@ -6,6 +6,7 @@ p { font-size: 13px; line-height: 16px; }
 
 :root {
 	--radius: 5px;
+	--color: #4d2847;
 }
 
 .color { color: var(--color); }

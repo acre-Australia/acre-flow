@@ -13,14 +13,16 @@
 	<script src="@{REPO.ui}"></script>
 	@{import('meta', 'head', 'favicon.ico')}
 	<style>
+		/* this view imports no project stylesheet, so the brand colour is declared here */
+		:root { --color: #4d2847; }
 		body { background-color: #F2F5FE; }
 		.login { max-width: 300px; text-align: left; margin: 0 auto; width: 100%; }
 		.login.hidden { display: none; }
 		.login-loading { max-width: 300px; margin: 0 auto; width: 100%; text-align: center; color: #6b7280; }
 		.login-loading.hidden { display: none; }
 		.login-loading > div { background-color: #FFF; padding: 30px; border-radius: var(--radius); box-shadow: 0 0 20px rgba(0,0,0,0.1); }
-		.login-loading .spinner { width: 30px; height: 30px; border: 3px solid #dbe4ff; border-top-color: var(--color); border-radius: 50%; margin: 0 auto 12px; animation: spin 0.9s linear infinite; }
-		@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+		.login-loading .spinner { width: 62px; height: 40px; background: url(@{#}/img/acre-logo.svg) no-repeat 50% 50%; background-size: contain; margin: 0 auto 12px; animation: acreloading 1.4s ease-in-out infinite; }
+		@keyframes acreloading { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 		.login > div { background-color: #FFF; padding: 30px; border-radius: var(--radius); box-shadow: 0 0 20px rgba(0,0,0,0.1); }
 		footer { font-size: 11px; color: #999; text-align: center; padding: 0 0 10px; }
 		footer a { color: #777; }
