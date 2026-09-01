@@ -19,6 +19,8 @@ Flow.on('remove', function(flow) {
 	flow && flow.id && MODS.flowdb.removeflow(flow.id);
 });
 
+const INIT_TIMEOUT = 60000;
+
 function init(id, next) {
 
 	var flow = Flow.db[id];
@@ -34,8 +36,30 @@ function init(id, next) {
 	flow.asfiles = CONF.flowstream_asfiles === true;
 	flow.worker = CONF.flowstream_worker;
 
-	Flow.load(flow, function(err, instance) {
+	// Flow.load can call back twice when a worker crashes and auto-restarts (each
+	// init_worker reuses the same callback), so guard it either way
+	var done = false;
+	var timeout = null;
+
+	var finish = function(reason) {
+
+		if (done)
+			return;
+
+		done = true;
+		timeout && clearTimeout(timeout);
+		timeout = null;
+
+		if (reason)
+			console.error('FlowStream "' + (flow.name || id) + '" (' + id + ') ' + reason + ' - continuing with the remaining FlowStreams.');
+
 		next();
+	};
+
+	timeout = setTimeout(finish, INIT_TIMEOUT, 'did not become ready within ' + (INIT_TIMEOUT / 1000) + 's');
+
+	Flow.load(flow, function(err) {
+		finish(err ? ('failed to load: ' + err) : null);
 	});
 }
 
@@ -46,6 +70,25 @@ ON('init', function() {
 				next();
 			else
 				init(key, next);
+		}, function() {
+
+			// Flow.instances[id] is what +SOCKET /flows/{id}/ resolves against, so anything
+			// missing here is a flowstream the designer cannot open - it will connect and be
+			// disconnected in a loop. Say so once at boot instead of leaving it to be found
+			// by opening each one in the UI.
+			var missing = [];
+
+			for (var key in Flow.db) {
+				if (key !== 'variables' && !Flow.instances[key])
+					missing.push(key + ' (' + (Flow.db[key].name || 'unnamed') + ')');
+			}
+
+			if (missing.length) {
+				console.error('FlowStream: ' + missing.length + ' FlowStream(s) have no running instance and cannot be opened in the designer:');
+				for (var m of missing)
+					console.error('  - ' + m);
+			}
+
 		});
 	});
 });
