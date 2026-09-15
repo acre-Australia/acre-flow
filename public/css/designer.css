@@ -426,3 +426,17 @@ body.ui-dark { background-color: #202020 !important; }
 
 .flowcomponentscontainer .ui-search-used .caption { display: none; }
 .flowcomponentscontainer .ui-search-used .block { padding-bottom: 10px; }
+
+/* A component can put a colour on one of its input or output ports. The designer paints
+   the port label with it but leaves the connector dot on its own palette, so these two
+   rules make the dot follow the port colour - that is what lets a port show its live
+   state. Only ports carrying an inline colour are touched, so every other dot keeps the
+   stock grey and the green it turns when connected, and color:inherit is needed because
+   the dark theme sets the dot's colour directly, which would otherwise beat the inherited
+   value. The .disabled selectors are listed as well to outweigh the red this stylesheet
+   paints a paused dot: a paused port keeps its own colour and is still told apart by the
+   larger dot it is given. */
+.ui-flow .input[style*="color"] .component-io,
+.ui-flow .output[style*="color"] .component-io,
+.ui-flow .input[style*="color"] .component-io.disabled,
+.ui-flow .output[style*="color"] .component-io.disabled { color: inherit !important; background-color: currentColor !important; }
