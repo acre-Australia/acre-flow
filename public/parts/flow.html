@@ -148,7 +148,7 @@
 
 		<section data-type="main">
 			<ui-component name="viewbox" config="parent:auto;visibleX:true;visibleY:true;scrollbar:true;margin:0;scrollbarshadow:0;$id:flowviewbox">
-				<ui-component name="flow" path="?.data" config="width:10000;height:10000;markers:0;grid:16;horizontal:1;snapping:0;=curvedlines:common.curvedlines;steplines:1;infopath:?/refreshinfo;outputoffsetY:2;inputoffsetY:2;undopath:?.undo;redopath:?.redo;ondrop:?/drop;contextmenu:?/contextmenu;dblclick:?/settings;onmove:?/onmove;onpause:?/onpause;onconnect:?/onconnect;$assign:Designer;dblclickgroup:?/groupedit;animationlimit:300;animationlimitconnection:3"></ui-component>
+				<ui-component name="flow" path="?.data" config="width:10000;height:10000;markers:0;grid:16;horizontal:1;snapping:0;=curvedlines:common.curvedlines;steplines:1;infopath:?/refreshinfo;outputoffsetY:2;inputoffsetY:2;allowpause:0;undopath:?.undo;redopath:?.redo;ondrop:?/drop;contextmenu:?/contextmenu;dblclick:?/settings;onmove:?/onmove;onpause:?/onpause;onconnect:?/onconnect;$assign:Designer;dblclickgroup:?/groupedit;animationlimit:300;animationlimitconnection:3"></ui-component>
 			</ui-component>
 		</section>
 
@@ -1412,14 +1412,26 @@
 				instances.push(obj);
 			}
 
+			// Clicking an input/output dot used to pause that input/output ("allowpause" is off
+			// now, see the flow component above). Nothing can release a pause stored in an older
+			// design anymore, and a red dot silently holding back messages is exactly the
+			// confusion the setting removes - so forget it and tell the worker.
+			var wastepaused = response.paused != null && Object.keys(response.paused).length > 0;
+			if (wastepaused)
+				delete response.paused;
+
 			exports.scope();
 			SET('?.connected', count);
 			SET('?.data', response);
-			SET('?.changed', uninitializedcount > 0);
+			SET('?.changed', uninitializedcount > 0 || wastepaused);
 			SET('?.ready', true, 500);
 			SET('?.instances', instances);
 			Designer.CMD('flow.refresh');
 			historyreload();
+
+			// "?.ready" above is delayed and autosave needs it
+			if (wastepaused)
+				setTimeout(exports.autosave, 1000);
 			setTimeout(() => W.flowinstances.exec('*', 'redraw'), 200);
 		};
 
