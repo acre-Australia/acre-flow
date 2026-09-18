@@ -104,19 +104,20 @@
 		</div>
 
 		<div>
-			<!--
-			<button disabled title="@(Undo)" is="is-button" path="?.undo" config="enabled:value && value.length" class="exec" data-exec="?/operation" data-type="undo"><i class="ti ti-undo"></i></button>
-			<button disabled title="@(Redo)" is="is-button" path="?.redo" config="enabled:value && value.length" class="exec" data-exec="?/operation" data-type="redo"><i class="ti ti-redo"></i></button>
-			-->
 			<button title="@(Zoom in)" class="exec" data-exec="?/operation" data-type="in"><i class="ti ti-search-plus"></i></button>
 			<button title="@(Zoom out)" class="exec" data-exec="?/operation" data-type="out"><i class="ti ti-search-minus"></i></button>
 			<button title="@(Zoom out/Zoom reset)" class="exec" data-exec="?/operation" data-type="out2"><i class="ti ti-search-dot"></i></button>
 		</div>
 
 		<div>
+			<button disabled title="@(Undo)" is="is-button" path="?.historyundo" config="enabled:!!value" class="exec" data-exec="?/undo"><i class="ti ti-undo"></i></button>
+			<button disabled title="@(Redo)" is="is-button" path="?.historyredo" config="enabled:!!value" class="exec" data-exec="?/redo"><i class="ti ti-redo"></i></button>
+		</div>
+
+		<div>
 			<button title="@(Options)" class="exec" data-exec="?/options"><i class="ti ti-cog"></i></button>
 			<button title="@(Backup)" class="exec" data-exec="?/managebackup"><i class="ti ti-database-alt"></i></button>
-			<button title="@(Collapse)" class="exec" data-exec="?/togglefullscreen" id="flow-collapse-btn"><i class="ti ti-fullscreen"></i></button>
+			<button title="@(Expand)" class="exec" data-exec="?/togglefullscreen" id="flow-collapse-btn"><i class="ti ti-fullscreen"></i></button>
 		</div>
 
 		<div style="border-right:0;margin-top:4px">
@@ -128,7 +129,7 @@
 			</ui-bind>
 		</div>
 	</header>
-	<button id="flow-floating-btn" class="exec" data-exec="?/togglefullscreen" title="@(Expand)"><i class="ti ti-compress"></i></button>
+	<button id="flow-floating-btn" class="exec" data-exec="?/togglefullscreen" title="@(Collapse)"><i class="ti ti-compress"></i></button>
 	<div class="header-empty"></div>
 
 	<ui-component name="layout" path="?.layout" config="margin:50;$id:flowlayout">
@@ -147,7 +148,7 @@
 
 		<section data-type="main">
 			<ui-component name="viewbox" config="parent:auto;visibleX:true;visibleY:true;scrollbar:true;margin:0;scrollbarshadow:0;$id:flowviewbox">
-				<ui-component name="flow" path="?.data" config="width:10000;height:10000;markers:0;grid:16;horizontal:1;snapping:0;=curvedlines:common.curvedlines;steplines:1;infopath:?/refreshinfo;outputoffsetY:2;inputoffsetY:2;undopath:?.undo;redopath:?.redo;ondrop:?/drop;contextmenu:?/contextmenu;dblclick:?/settings;onmove:?/onmove;onpause:?/onpause;onconnect:?/onconnect;$assign:Designer;dblclickgroup:?/groupedit;animationlimit:300;animationlimitconnection:3"></ui-component>
+				<ui-component name="flow" path="?.data" config="width:10000;height:10000;markers:0;grid:16;horizontal:1;snapping:0;=curvedlines:common.curvedlines;steplines:1;infopath:?/refreshinfo;outputoffsetY:2;inputoffsetY:2;allowpause:0;undopath:?.undo;redopath:?.redo;ondrop:?/drop;contextmenu:?/contextmenu;dblclick:?/settings;onmove:?/onmove;onpause:?/onpause;onconnect:?/onconnect;$assign:Designer;dblclickgroup:?/groupedit;animationlimit:300;animationlimitconnection:3"></ui-component>
 			</ui-component>
 		</section>
 
@@ -956,7 +957,11 @@
 			}, 2500);
 		};
 
-		var persistflow = function(issilent) {
+		// Turns the canvas into the design the worker stores (the payload of a "save"
+		// message). With "commit" every instance is marked as connected/unchanged, which is
+		// what an actual save does; without it the canvas is left untouched, so the result can
+		// be used as a read-only snapshot (see the undo/redo history below).
+		var serializedesign = function(commit) {
 
 			var model = flow.data;
 			var output = {};
@@ -996,15 +1001,24 @@
 				item.tab = com.tab;
 				item.connected = true;
 
-				var wasconnected = com.connected === true;
-				com.changes = null;
-				com.connected = true;
-
-				if (!wasconnected)
-					newlyconnected.push(item.id);
+				if (commit) {
+					if (com.connected !== true)
+						newlyconnected.push(item.id);
+					com.changes = null;
+					com.connected = true;
+				}
 
 				output[item.id] = item;
 			}
+
+			return { data: output, newlyconnected: newlyconnected };
+		};
+
+		var persistflow = function(issilent) {
+
+			var design = serializedesign(true);
+			var output = design.data;
+			var newlyconnected = design.newlyconnected;
 
 			$('.isnewbie').rclass('isnewbie');
 			SET('?.changed', false);
@@ -1053,6 +1067,120 @@
 					return;
 				persistflow(true);
 			}, 700);
+		};
+
+		// ===== Undo / Redo =====
+		//
+		// The history is kept in this browser tab only - reopening the designer starts with an
+		// empty history. An entry is a whole design (the very payload a save sends), so undo and
+		// redo simply push an older design back through the normal "save" message: the worker is
+		// rewritten and echoes "flow/design", which reloads the canvas. Client and worker
+		// therefore always end up on the same design.
+		var HISTORYLIMIT = 50;
+		var designhistory = { undo: [], redo: [], current: null, applying: false };
+
+		var historysnapshot = function() {
+			return STRINGIFY(serializedesign(false).data);
+		};
+
+		var historyrefresh = function() {
+			SET('?.historyundo', designhistory.undo.length);
+			SET('?.historyredo', designhistory.redo.length);
+		};
+
+		// Remembers the design as it stands now. Called (debounced) after every change that
+		// reached the worker, and once for the design the designer starts with.
+		var historycommit = function() {
+
+			// An undo/redo is on its way back from the worker - only its own "flow/design"
+			// settles the history, see historyreload()
+			if (designhistory.applying)
+				return;
+
+			var snapshot = historysnapshot();
+
+			if (designhistory.current === snapshot)
+				return;
+
+			if (designhistory.current != null) {
+				designhistory.undo.push(designhistory.current);
+				if (designhistory.undo.length > HISTORYLIMIT)
+					designhistory.undo.shift();
+				designhistory.redo = [];
+			}
+
+			designhistory.current = snapshot;
+			historyrefresh();
+		};
+
+		// Changes arrive in bursts (a drop plus its autosave echo, a drag, typing in a
+		// configuration form), so only the settled design becomes a history entry.
+		var historychanged = function() {
+			setTimeout2('flow.history', historycommit, 600);
+		};
+
+		// Every design pushed by the worker lands here: the one the designer opens with, the echo
+		// of an ordinary save, and the echo of an undo/redo (which must not become a new entry).
+		var historyreload = function() {
+
+			if (designhistory.applying) {
+				clearTimeout2('flow.history');
+				designhistory.applying = false;
+				designhistory.current = historysnapshot();
+				historyrefresh();
+			} else
+				historychanged();
+		};
+
+		var historyapply = function(snapshot) {
+
+			designhistory.applying = true;
+
+			// A pending autosave would push the design we are leaving straight back
+			if (autosavetimer) {
+				clearTimeout(autosavetimer);
+				autosavetimer = null;
+			}
+
+			SET('?.changed', false);
+			SETTER('websocket/send', { TYPE: 'save', data: PARSE(snapshot), callback: function(response) {
+				if (response && response.error) {
+					designhistory.applying = false;
+					SETTER('notify/warning', response.error);
+				}
+			}});
+
+			// The worker echoes "flow/design", which reloads the canvas and settles the history.
+			// Release the lock anyway if that echo never arrives.
+			setTimeout(function() {
+				if (designhistory.applying) {
+					designhistory.applying = false;
+					designhistory.current = historysnapshot();
+					historyrefresh();
+				}
+			}, 5000);
+		};
+
+		var historymove = function(stack, target) {
+
+			if (designhistory.applying || !stack.length)
+				return;
+
+			// Do not let a half-debounced change overwrite the entry we are moving to
+			clearTimeout2('flow.history');
+
+			target.push(designhistory.current);
+			designhistory.current = stack.pop();
+			historyrefresh();
+			historyapply(designhistory.current);
+		};
+
+		exports.undo = function() {
+			historymove(designhistory.undo, designhistory.redo);
+		};
+
+		exports.redo = function() {
+			historymove(designhistory.redo, designhistory.undo);
 		};
 
 		exports.submit = function() {
@@ -1284,13 +1412,26 @@
 				instances.push(obj);
 			}
 
+			// Clicking an input/output dot used to pause that input/output ("allowpause" is off
+			// now, see the flow component above). Nothing can release a pause stored in an older
+			// design anymore, and a red dot silently holding back messages is exactly the
+			// confusion the setting removes - so forget it and tell the worker.
+			var wastepaused = response.paused != null && Object.keys(response.paused).length > 0;
+			if (wastepaused)
+				delete response.paused;
+
 			exports.scope();
 			SET('?.connected', count);
 			SET('?.data', response);
-			SET('?.changed', uninitializedcount > 0);
+			SET('?.changed', uninitializedcount > 0 || wastepaused);
 			SET('?.ready', true, 500);
 			SET('?.instances', instances);
 			Designer.CMD('flow.refresh');
+			historyreload();
+
+			// "?.ready" above is delayed and autosave needs it
+			if (wastepaused)
+				setTimeout(exports.autosave, 1000);
 			setTimeout(() => W.flowinstances.exec('*', 'redraw'), 200);
 		};
 
@@ -1532,6 +1673,7 @@
 		};
 
 		exports.onmove = function(el, item, type) {
+			historychanged();
 			if (type === 'group') {
 				SETTER('websocket/send', { TYPE: 'groups', data: flow.data.groups });
 			} else {
@@ -1868,11 +2010,13 @@
 					item.element.closest('.component').css({ left: item.x, top: item.y });
 					W.flowinstances.exec(msg.id, 'move', msg.data);
 					Designer.CMD('flow.refresh');
+					historychanged();
 					break;
 
 				case 'flow/groups':
 					flow.data.groups = msg.data;
 					Designer.CMD('flow.refresh');
+					historychanged();
 					break;
 
 				case 'flow/variables':
@@ -1900,6 +2044,7 @@
 						SET('flow.data.' + msg.id + '.config', msg.data);
 						SET('flow.config.' + msg.id, msg.data);
 						W.flowinstances.exec(msg.id, 'configure', msg.data);
+						historychanged();
 					}
 					break;
 			}
