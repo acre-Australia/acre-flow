@@ -1422,10 +1422,12 @@
 
 			exports.scope();
 			SET('?.connected', count);
+			// Before "?.data": rendering the design runs each component's client-side code,
+			// and anything that throws there would otherwise leave "flow.instances" unset
+			SET('?.instances', instances);
 			SET('?.data', response);
 			SET('?.changed', uninitializedcount > 0 || wastepaused);
 			SET('?.ready', true, 500);
-			SET('?.instances', instances);
 			Designer.CMD('flow.refresh');
 			historyreload();
 
@@ -1437,7 +1439,8 @@
 
 		var onremove = function() {
 			W.flowinstances.remove(this.id);
-			var index = flow.instances.findIndex('id', this.id);
+			// "flow.instances" is missing if loadflow() threw before setting it
+			var index = flow.instances ? flow.instances.findIndex('id', this.id) : -1;
 			if (index !== -1)
 				flow.instances.splice(index, 1);
 		};
