@@ -79,15 +79,9 @@
 <ui-plugin name="flow" class="flow">
 
 	<header class="header">
-
-		<div is="is-div" path="?.head.proxyurl" config="show;href a" class="header-special">
-			<button class="exec" data-exec="?/copyendpoint" title="@(Copy endpoint to the clipboard)" style="margin-left:10px"><i class="ti ti-link"></i></button>
-			<a title="@(Open endpoint)" target="_blank"><i class="ti ti-globe"></i></a>
-		</div>
-
 		<div class="pull-right">
 			<a href="https://docs.totaljs.com/flow10/" title="@(Documentation: Total.js Platform)" target="_blank" class="special"><i class="ti ti-book"></i></a>
-			<button title="@(FlowStream information)" class="exec pull-right" data-exec="?/info"><i class="ti ti-info-circle color"></i></button>
+			<button title="@(Version)" class="exec pull-right" data-exec="?/version"><i class="ti ti-info-circle color"></i></button>
 		</div>
 
 		<div is="is-div" path="?.changed" config=".highlight button" class="apply-button">
@@ -98,7 +92,7 @@
 			<button title="@(Pause)" class="exec" data-exec="?/pause" is="is-button" path="?.stats.paused" config=".paused"><i class="ti ti-pause"></i><span></span></button>
 			<button title="@(Add)" class="exec green" data-exec="?/add"><i class="ti ti-plus-circle"></i></button>
 			<button title="@(Variables)" class="exec" data-exec="?/variables"><i class="ti ti-variables"></i></button>
-			<button title="@(Console)" class="exec" data-exec="?/console" is="is-button" path="common.logs.errors.items.length" config=".red"><i class="ti ti-bug"></i></button>
+			<button title="@(Console Errors)" class="exec" data-exec="?/console" is="is-button" path="common.logs.errors.items.length" config=".red"><i class="ti ti-exclamation-triangle"></i></button>
 			<!-- <button title="@(Reset)" class="exec hidden" data-exec="?/reset" is="is-button" path="common.logs.errors.items.length" config="show"><i class="ti ti-clean"></i></button> -->
 			<button title="@(Search in configuration)" class="exec" data-exec="?/search"><i class="ti ti-file-search"></i></button>
 		</div>
@@ -317,12 +311,7 @@
 			opt.element = el;
 			opt.items = [];
 
-			opt.items.push({ id: 'create', name: '@(Create component)', icon: 'ti ti-code' });
 			opt.items.push({ id: 'opensource', name: '@(Download components)', icon: 'ti ti-download' });
-			opt.items.push({ id: 'import', icon: 'ti ti-share-alt', name: '@(Link component)' });
-			opt.items.push({ id: 'link', name: '@(Link endpoint)', icon: 'ti ti-network' });
-			opt.items.push('-');
-			opt.items.push({ id: 'sources', name: '@(TMS sources)', icon: 'ti ti-code-branch' });
 
 			opt.callback = function(item) {
 
@@ -1700,12 +1689,6 @@
 			opt.items.push({ id: 'search', name: '@(Search in configuration)', icon: 'ti ti-file-search' });
 			opt.items.push({ id: 'version', name: '@(Version)', icon: 'ti ti-info-circle' });
 			opt.items.push('-');
-			opt.items.push({ id: 'download', name: '@(Download)', icon: 'ti ti-download' });
-			opt.items.push({ id: 'export', name: '@(Export)', icon: 'ti ti-file-export' });
-			opt.items.push({ id: 'exportascomponent', name: '@(Export to component)', icon: 'ti ti-plug' });
-			opt.items.push({ id: 'exportasbase64', name: '@(Export to BASE64)', icon: 'ti ti-plug' });
-			opt.items.push({ id: 'importascomponent', name: '@(Import component)', icon: 'ti ti-paste' });
-			opt.items.push('-');
 			opt.items.push({ id: 'curvedlines', name: '@(Curved lines)', icon: 'ti ti-bezier-curve', selected: common.curvedlines == true });
 			opt.items.push({ id: 'reset_stats', name: '@(Reset stats)', icon: 'ti ti-chart-line' });
 			opt.items.push('-');
@@ -1713,7 +1696,6 @@
 			if (model.head.worker)
 				opt.items.push({ id: 'restart', name: '@(Restart worker)', icon: 'ti ti-sync' });
 
-			opt.items.push({ id: 'clearunused', name: '@(Clear unused components)', icon: 'ti ti-recycle' });
 			opt.items.push({ id: 'clear', name: '@(Clear)', icon: 'ti ti-remove red' });
 
 			opt.callback = function(item) {
@@ -2569,6 +2551,10 @@
 
 		exports.selected_remove = function() {
 			Designer.CMD('flow.selected.clear');
+		};
+
+		exports.version = function() {
+			SET('common.form', 'versionform');
 		};
 
 		exports.info = function() {
