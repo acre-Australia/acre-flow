@@ -19,6 +19,37 @@ Flow.on('remove', function(flow) {
 	flow && flow.id && MODS.flowdb.removeflow(flow.id);
 });
 
+// The designer socket is accepted as soon as Flow.load registers the instance, but a
+// forked worker still has to boot and compile every component before flow.load
+// finishes. A client that connects in that window gets its initial sync
+// (flow/components, flow/design) from the still-empty FlowStream, and total5 never
+// re-sends it: the first "schema" event after load deliberately skips the refresh
+// (MAKEFLOWSTREAM in total5/flow-flowstream.js). On a slow controller this is exactly
+// what happens right after Streams/save creates a FlowStream - the designer shows an
+// empty palette until the page is reloaded. Locally the worker wins the race.
+//
+// "load" fires once the worker reports ready (FS.load in total5/flow.js), so replay
+// the new-client handshake for anyone who connected early. Harmless for clients that
+// already have a full sync, it is the same handshake a reconnect performs.
+Flow.on('load', function(instance) {
+
+	var flow = instance && instance.flow;
+	var socket = flow && flow.$socket;
+
+	if (!socket || !socket.online)
+		return;
+
+	for (var key in socket.connections) {
+		var client = socket.connections[key];
+		if (!client.isflowstreamready)
+			continue;
+		if (flow.isworkerthread)
+			flow.postMessage2({ TYPE: 'ui/newclient', clientid: client.id });
+		else
+			flow.proxy.newclient(client.id);
+	}
+});
+
 const INIT_TIMEOUT = 60000;
 
 function init(id, next) {
