@@ -166,6 +166,22 @@
 		common.env = '@{PREF.env}';
 		common.templates = '@{PREF.templates}';
 		common.bundle = '@{F.isBundle}' === 'true';
+		common.darkmode = function(isDark) {
+			$('body').tclass('ui-dark', isDark);
+			var win = $('.ui-parts-item');
+			for (var i = 0; i < win.length; i++) {
+				var w = $(win[i]).find('iframe')[0];
+				if (w)
+					w.contentWindow.postMessage(STRINGIFY({ TYPE: 'darkmode', value: isDark }), '*');
+			}
+		};
+
+		W.addEventListener('message', function(e) {
+			var data = e.data;
+			if (data && data.source === 'webserver' && data.topic === 'theme')
+				common.darkmode(data.theme === 'dark');
+		});
+
 		common.cl = {}; // for additional codelists
 		common.dataStream = null; // for data stream from designer
 		common.payloads = {
@@ -285,15 +301,7 @@
 				});
 			})();
 
-			exports.darkmode = function(isDark) {
-				$('body').tclass('ui-dark', isDark);
-				var win = $('.ui-parts-item');
-				for (var i = 0; i < win.length; i++) {
-					var w = $(win[i]).find('iframe')[0];
-					if (w)
-						w.contentWindow.postMessage(STRINGIFY({ TYPE: 'darkmode', value: isDark }), '*');
-				}
-			};
+			exports.darkmode = common.darkmode;
 
 			WATCH('common.flowfullscreen', function(path, value) {
 				$('.appmain').tclass('is-fullscreen', value);
@@ -857,10 +865,6 @@
 							notifyParentActivity();
 							break;
 						}
-					}
-				} else if (data && data.source === 'webserver') {
-					if (data.topic === 'theme') {
-						EXEC('common/darkmode', data.theme === 'dark');
 					}
 				}
 			});
