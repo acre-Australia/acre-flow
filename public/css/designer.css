@@ -92,7 +92,13 @@ body.ui-dark { background-color: #202020 !important; }
 .flowcomponents .name div { margin-right: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flowcomponents .name span { font-weight: normal; font-size: 11px; float: right; color: #777; }
 .flowcomponents .name em { font-weight: normal; font-size: 11px; color: #777; margin-left: 5px; }
-.flowcomponents .caption { padding: 12px 10px 5px; font-size: 12px; color: #999; }
+.flowcomponents .caption { padding: 12px 10px 5px; font-size: 12px; font-weight: bold; color: #000; cursor: pointer; user-select: none; }
+.flowcomponents .caption:hover { color: #555; }
+.flowcomponents .caption i { transition: transform 0.15s ease; }
+.flowcomponents .flowgroup.collapsed .caption i { transform: rotate(-90deg); }
+.flowcomponents .flowgroup.collapsed .flowgroup-items { display: none; }
+.flowcomponents.searching .flowgroup.collapsed .flowgroup-items { display: block; }
+.flowcomponents.searching .flowgroup.collapsed .caption i { transform: none; }
 .ui-flow-h .output:last-child { border-radius: 0; }
 .ui-flow-h .input:last-child { border-radius: 0; }
 
@@ -118,7 +124,8 @@ body.ui-dark { background-color: #202020 !important; }
 .ui-dark .flowcomponents .type span { color: #FFF; }
 .ui-dark .flowcomponents .type2 span { color: #999; background-color: #4E4E4E; }
 .ui-dark .flowcomponents .url { color: #999; }
-.ui-dark .flowcomponents .caption { color: #999; }
+.ui-dark .flowcomponents .caption { color: #FFF; }
+.ui-dark .flowcomponents .caption:hover { color: #CCC; }
 
 .controls { float: right; margin-right: 10px; }
 .controls button { width: 22px; height: 22px; border: 0; background-color: #FFF; line-height: 22px; padding: 0 5px; border-radius: var(--radius); margin-left: 2px; }
