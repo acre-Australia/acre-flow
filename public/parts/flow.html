@@ -84,14 +84,14 @@
 			<button title="@(Version)" class="exec pull-right" data-exec="?/version"><i class="ti ti-info-circle color"></i></button>
 		</div>
 
-		<div is="is-div" path="?.changed" config=".highlight button" class="apply-button">
+		<div is="is-div" path="?.changed" config=".highlight button" class="apply-button readonly-hide">
 			<button class="exec apply" data-exec="?/submit"><i class="ti ti-play"></i><span>@(APPLY)</span></button>
 		</div>
 
 		<div>
-			<button title="@(Pause)" class="exec" data-exec="?/pause" is="is-button" path="?.stats.paused" config=".paused"><i class="ti ti-pause"></i><span></span></button>
-			<button title="@(Add)" class="exec green" data-exec="?/add"><i class="ti ti-plus-circle"></i></button>
-			<button title="@(Variables)" class="exec" data-exec="?/variables"><i class="ti ti-variables"></i></button>
+			<button title="@(Pause)" class="exec readonly-hide" data-exec="?/pause" is="is-button" path="?.stats.paused" config=".paused"><i class="ti ti-pause"></i><span></span></button>
+			<button title="@(Add)" class="exec green readonly-hide" data-exec="?/add"><i class="ti ti-plus-circle"></i></button>
+			<button title="@(Variables)" class="exec readonly-hide" data-exec="?/variables"><i class="ti ti-variables"></i></button>
 			<button title="@(Console Errors)" class="exec" data-exec="?/console" is="is-button" path="common.logs.errors.items.length" config=".red"><i class="ti ti-exclamation-triangle"></i></button>
 			<button title="@(Search in configuration)" class="exec" data-exec="?/search"><i class="ti ti-file-search"></i></button>
 		</div>
@@ -102,7 +102,7 @@
 			<button title="@(Zoom out/Zoom reset)" class="exec" data-exec="?/operation" data-type="out2"><i class="ti ti-search-dot"></i></button>
 		</div>
 
-		<div>
+		<div class="readonly-hide">
 			<button disabled title="@(Undo)" is="is-button" path="?.historyundo" config="enabled:!!value" class="exec" data-exec="?/undo"><i class="ti ti-undo"></i></button>
 			<button disabled title="@(Redo)" is="is-button" path="?.historyredo" config="enabled:!!value" class="exec" data-exec="?/redo"><i class="ti ti-redo"></i></button>
 		</div>
@@ -259,6 +259,29 @@
 		function isdefaultcomponent(component) {
 			return !!(component && (common.defaultcomponents || EMPTYARRAY).indexOf(component.id) !== -1);
 		}
+
+		// Engineer Mode is off in the main app (common.readonly, see views/index.html): the
+		// design can be viewed but not changed. Guards every action that edits the FlowStream.
+		function isreadonly() {
+			if (common.readonly) {
+				SETTER('notify/warning', '@(Read-only mode. Turn on Engineer Mode to make changes.)');
+				return true;
+			}
+		}
+
+		// Keeps headers and the allowed menu items, then tidies up the separators
+		function readonlyitems(items, allowed) {
+			var arr = [];
+			for (var m of items) {
+				if (m === '-') {
+					arr.length && arr.last() !== '-' && arr.push(m);
+				} else if (typeof(m) === 'string' || allowed.includes(m.id))
+					arr.push(m);
+			}
+			arr.last() === '-' && arr.pop();
+			return arr;
+		}
+
 		var initialized_settings = {};
 		var checksums = {};
 		var settings_current;
@@ -306,6 +329,9 @@
 
 		exports.add = function(el) {
 
+			if (isreadonly())
+				return;
+
 			var opt = {};
 			opt.element = el;
 			opt.items = [];
@@ -339,6 +365,9 @@
 		};
 
 		exports.dropfiles = function(files) {
+			if (isreadonly())
+				return;
+
 			var arr = [];
 			for (var m of files)
 				arr.push(m);
@@ -367,6 +396,9 @@
 		};
 
 		exports.create = function() {
+			if (isreadonly())
+				return;
+
 			common.form && NUL('common.form');
 			AJAX('GET /component.txt @showloading', function(response) {
 				SET('componenteditor @default', { flowstreamid: flowstreamid, body: response.args({ id: FUNC.makeid('c') }) });
@@ -375,6 +407,9 @@
 		};
 
 		exports.link = function() {
+			if (isreadonly())
+				return;
+
 			AJAX('GET /endpoint.txt @showloading', function(response) {
 				SET('formendpoint @default', { flowstreamid: flowstreamid, body: response });
 				SET('common.form @hideloading', 'formendpoint');
@@ -382,6 +417,9 @@
 		};
 
 		exports.components = function() {
+			if (isreadonly())
+				return;
+
 			SET('common.form', 'componentsform');
 		};
 
@@ -391,6 +429,9 @@
 		};
 
 		exports.clear = function() {
+			if (isreadonly())
+				return;
+
 			SETTER('approve/show', '@(Are you sure you want to clear the current Flow?)', '"trash-o" @(Clear)', function() {
 				exports.set('data', {});
 			});
@@ -435,6 +476,8 @@
 			var item = info.selected;
 
 			if (type === 'map' && info.type !== 'group') {
+				if (common.readonly)
+					return;
 				var opt = {};
 				opt.x = e.pageX;
 				opt.y = e.pageY;
@@ -514,6 +557,12 @@
 
 			if (opt.items.last() === '-')
 				opt.items.pop();
+
+			if (common.readonly) {
+				opt.items = readonlyitems(opt.items, ['readme', 'exportcomponents', 'download']);
+				if (!opt.items.some(m => typeof(m) === 'object'))
+					return;
+			}
 
 			opt.callback = function(opt) {
 				switch (opt.id) {
@@ -631,6 +680,9 @@
 			if (e && e.target && (e.target.tagName === 'BUTTON' || e.target.tagName === 'A'))
 				return;
 
+			if (isreadonly())
+				return;
+
 			if (instance instanceof jQuery) {
 				instance = flow.data[ATTRD(instance)];
 				if (!instance)
@@ -708,6 +760,9 @@
 		};
 
 		exports.settings_submit = function() {
+			if (isreadonly())
+				return;
+
 			var model = GET(FIND('#settingsvalidation').path + ' @clone');
 			settings_data.config = model;
 			EMIT('configure_save_' + settings_data.name, settings_data);
@@ -1164,14 +1219,23 @@
 		};
 
 		exports.undo = function() {
+			if (isreadonly())
+				return;
+
 			historymove(designhistory.undo, designhistory.redo);
 		};
 
 		exports.redo = function() {
+			if (isreadonly())
+				return;
+
 			historymove(designhistory.redo, designhistory.undo);
 		};
 
 		exports.submit = function() {
+
+			if (isreadonly())
+				return;
 
 			SETTER('approve/show', '@(Are you sure you want to save and apply Flow?)', '"ti ti-check-circle" @(Continue)', function() {
 
@@ -1184,6 +1248,9 @@
 		};
 
 		exports.clone = function() {
+
+			if (isreadonly())
+				return;
 
 			var model = exports.model;
 			var selected = Designer.selected();
@@ -1266,6 +1333,9 @@
 		};
 
 		exports.drop = function(e, grid) {
+
+			if (isreadonly())
+				return;
 
 			var id = ATTRD(e.el);
 			var offsetX = e.clickX || 0;
@@ -1655,6 +1725,9 @@
 		};
 
 		exports.pause = function() {
+			if (isreadonly())
+				return;
+
 			var model = exports.model;
 			var is = model.stats.paused;
 			SETTER('loading/show');
@@ -1696,6 +1769,9 @@
 		};
 
 		exports.groupedit = function(item) {
+			if (isreadonly())
+				return;
+
 			SET('groupform @reset', CLONE(item));
 			SET('common.form', 'groupform');
 		};
@@ -1718,6 +1794,9 @@
 				opt.items.push({ id: 'restart', name: '@(Restart worker)', icon: 'ti ti-sync' });
 
 			opt.items.push({ id: 'clear', name: '@(Clear)', icon: 'ti ti-remove red' });
+
+			if (common.readonly)
+				opt.items = readonlyitems(opt.items, ['nodes', 'search', 'version', 'curvedlines']);
 
 			opt.callback = function(item) {
 
@@ -1790,6 +1869,9 @@
 		};
 
 		exports.importascomponent = function() {
+			if (isreadonly())
+				return;
+
 			navigator.clipboard.readText().then(function(text) {
 
 				var meta = FUNC.checkhtml(text);
@@ -2110,6 +2192,9 @@
 			opt.items.push({ id: 'import', name: '@(Import)', icon: 'ti ti-file-import' });
 			opt.items.push({ id: 'export', name: '@(Export)', icon: 'ti ti-file-export' });
 
+			if (common.readonly)
+				opt.items = readonlyitems(opt.items, ['export']);
+
 			opt.callback = function(item) {
 
 				switch (item.id) {
@@ -2150,6 +2235,9 @@
 		// never disagree with what the server enforces.
 		exports.createbackup = function(callback) {
 
+			if (isreadonly())
+				return;
+
 			TAPI('backup_list/{0} ERROR'.format(flowstreamid), function(response) {
 
 				if (!response.canadd) {
@@ -2166,6 +2254,9 @@
 		// The server keeps this flowstream's identity and only takes the design,
 		// components, variables and sources from the payload.
 		exports.importstate = function() {
+			if (isreadonly())
+				return;
+
 			SETTER('filereader/open', { accept: '.json,application/json', multiple: false, callback: function(file) {
 
 				var data = (file.body || '').parseJSON(true);
@@ -2196,6 +2287,9 @@
 		});
 
 		exports.variables = function() {
+			if (isreadonly())
+				return;
+
 			var model = {};
 			model.variables = CLONE(flow.variables);
 			model.callback = function(model) {
@@ -2235,6 +2329,9 @@
 				opt.items.push('-');
 				opt.items.push({ id: 'remove', name: '@(Remove)', icon: 'ti ti-remove red' });
 			}
+
+			if (common.readonly)
+				opt.items = readonlyitems(opt.items, ['readme', 'copy2', 'download']);
 
 			if (opt.items.length <= 1)
 				return;
@@ -2362,6 +2459,9 @@
 		};
 
 		exports.paste_components = function(pos) {
+
+			if (isreadonly())
+				return;
 
 			navigator.clipboard.readText().then(function(text) {
 
@@ -2563,6 +2663,9 @@
 		}
 
 		exports.selected_settings = function() {
+			if (isreadonly())
+				return;
+
 			var info = exports.data.info;
 			if (info.type === 'group')
 				exports.groupedit(info.selected);
@@ -2571,6 +2674,9 @@
 		};
 
 		exports.selected_remove = function() {
+			if (isreadonly())
+				return;
+
 			Designer.CMD('flow.selected.clear');
 		};
 
@@ -2616,6 +2722,9 @@
 		};
 
 		exports.pasteconfig = function(el) {
+			if (isreadonly())
+				return;
+
 			navigator.clipboard.readText().then(function(text) {
 				var data = PARSE(text);
 				if (data && data.type === 'config' && flow.selected.name === data.componentname) {
@@ -2628,6 +2737,9 @@
 		};
 
 		exports.resetconfig = function(el) {
+			if (isreadonly())
+				return;
+
 			SET('?.settings.settings_f' + flow.selected.component, {});
 			CHANGE('?.settings.settings_f' + flow.selected.component + '.*', true);
 			SETTER('notify/success', '@(Config reset.)');
@@ -2636,6 +2748,42 @@
 		FIND('flow', function(com) {
 			var zoom = FUNC.pref_read('zoom');
 			Designer.CMD('flow.zoom', zoom);
+
+			// Read-only: the designer has no option for it, so stop the mousedown that would start
+			// a move, a group resize or a connection before it reaches the designer's handlers.
+			// Components still get selected so their info shows, and their own buttons still work.
+			var block = function(e) {
+
+				if (!common.readonly || e.button)
+					return;
+
+				var target = $(e.target);
+				if (target.closest('button,a,.selectable').length)
+					return;
+
+				var component = target.closest('.component');
+				var port = target.closest('.output,.input');
+
+				if (port.length || component.length || target.closest('.ui-flow-group').length) {
+					e.stopPropagation();
+					!port.length && component.length && com.op.select(component.attrd('id'));
+				}
+			};
+
+			com.dom.addEventListener('mousedown', block, true);
+			com.dom.addEventListener('touchstart', block, true);
+		});
+
+		// Engineer Mode turned off while an editor is open: close it, its changes can't be applied
+		WATCH('common.readonly', function(path, value) {
+			if (!value)
+				return;
+			if (common.page === 'componenteditor')
+				SET('common.page', 'flow');
+			if (common.form && common.form !== 'versionform')
+				SET('common.form', '');
+			if (common.form2)
+				SET('common.form2', '');
 		});
 
 		FIND('#flowviewbox', function(com) {
