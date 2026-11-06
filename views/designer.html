@@ -103,6 +103,9 @@
 		common.logs = {};
 		common.logs.errors = { icon: 'ti ti-exclamation-triangle', name: '@(Errors)', encode: false, items: [] };
 		common.page = common.socket ? 'flow' : '';
+		// Engineer Mode off in the main app: see views/index.html (common.setreadonly)
+		common.readonly = '@{query.readonly}' === '1';
+		$('body').tclass('ui-readonly', common.readonly);
 		common.user = {
 			isFullEngineer: false
 		};
@@ -156,6 +159,10 @@
 						case 'darkmode':
 							$('body').tclass('ui-dark', msg.value === true);
 							break;
+						case 'readonly':
+							$('body').tclass('ui-readonly', msg.value === true);
+							SET('common.readonly', msg.value === true);
+							break;
 						case 'components':
 							common.components = msg.value;
 							break;
@@ -174,6 +181,11 @@
 				return;
 
 			var is = false;
+
+			if (common.readonly) {
+				e && e.preventDefault();
+				return;
+			}
 
 			if (common.page === 'componenteditor' && !common.form && !common.form2) {
 				EXEC('componenteditor/submit');
@@ -221,7 +233,7 @@
 			if (tag === 'INPUT' || tag === 'TEXTAREA')
 				return;
 
-			if (common.page === 'flow' && !common.form && !common.form2) {
+			if (common.page === 'flow' && !common.form && !common.form2 && !common.readonly) {
 				EXEC('flow/clone');
 				e.preventDefault();
 				e.stopPropagation();
@@ -247,7 +259,7 @@
 			if (tag === 'INPUT' || tag === 'TEXTAREA')
 				return;
 
-			if (common.page === 'flow' && !common.form && !common.form2 && (e.target.nodeName !== 'INPUT' && e.target.nodeName !== 'TEXTAREA')) {
+			if (common.page === 'flow' && !common.form && !common.form2 && !common.readonly && (e.target.nodeName !== 'INPUT' && e.target.nodeName !== 'TEXTAREA')) {
 				EXEC('flow/paste_components', { x: 0, y: 0 }, true);
 				e.preventDefault();
 				e.stopPropagation();
@@ -260,7 +272,7 @@
 			if (tag === 'INPUT' || tag === 'TEXTAREA')
 				return;
 
-			if (common.page === 'flow' && !common.form && !common.form2) {
+			if (common.page === 'flow' && !common.form && !common.form2 && !common.readonly) {
 				Designer.CMD('flow.selected.clear');
 				SET('flow.changed', true);
 				e.preventDefault();

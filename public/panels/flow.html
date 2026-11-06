@@ -14,7 +14,7 @@
 			<ui-component name="search" path="%flowsearch" config="selector:.exec3">
 				<ui-bind path="!flow.components2" config="template" class="flowcomponents block">
 					<script type="text/html">
-					<ui-bind path="flow.head.total" config="show:value>=4050" class="hidden block">
+					<ui-bind path="flow.head.total" config="show:value>=4050" class="hidden block readonly-hide">
 						<figure data-id="group" draggable="true" data-search="@(Group)" style="margin:10px 10px 5px">
 							<i class="ti ti-object-group"></i>
 							<div class="name"><div>@(Group)</div></div>
