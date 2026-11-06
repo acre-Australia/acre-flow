@@ -2774,8 +2774,32 @@
 			com.dom.addEventListener('touchstart', block, true);
 		});
 
+		// Read-only: hide the components panel, nothing can be added from it. The layout
+		// re-applies its original settings (left shown) on every resize and reset, e.g. when
+		// leaving fullscreen, so force it hidden in update() itself rather than once.
+		FIND('#flowlayout', function(layout) {
+			var update = layout.update;
+			layout.update = function(type, opt) {
+				if (type === 'left' && opt && common.readonly)
+					opt = Object.assign({}, typeof(opt) === 'string' ? opt.parseConfig() : opt, { show: false });
+				return update.call(this, type, opt);
+			};
+			common.readonly && layout.update('left', { show: false });
+		});
+
+		var readonlypanel = function() {
+			// Fullscreen hides the panel anyway and applyCollapsed() restores it on exit
+			if ($('ui-plugin[name="flow"]').hclass('flow-fullscreen'))
+				return;
+			FIND('#flowlayout', function(layout) {
+				layout.update('left', { size: 200, minsize: 150, resize: true, show: true });
+				setTimeout(function() { EMIT('resize'); }, 50);
+			});
+		};
+
 		// Engineer Mode turned off while an editor is open: close it, its changes can't be applied
 		WATCH('common.readonly', function(path, value) {
+			readonlypanel();
 			if (!value)
 				return;
 			if (common.page === 'componenteditor')

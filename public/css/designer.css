@@ -4,6 +4,7 @@ body { background-color: #F0F0F0; }
 body.ui-dark { background-color: #202020 !important; }
 /* Engineer Mode off in the main app (see common.readonly) */
 body.ui-readonly .readonly-hide { display: none !important; }
+body:not(.ui-readonly) .readonly-show { display: none !important; }
 .radius { border-radius: var(--radius); }
 .ui-dark.opbody { background-color: #202020 !important; }
 .monospace { font-family: Menlo, Consolas, monospace; }

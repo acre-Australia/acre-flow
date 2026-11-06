@@ -29,7 +29,7 @@
 				{{ fi }}
 				{{ foreach m in value }}
 					<div class="item exec" data-exec="flow/find" data-search="{{ m.key }} {{ m.value.Component.name }} {{ m.value.note }}" data-id="{{ m.key }}">
-						<div class="controls">
+						<div class="controls readonly-hide">
 							{{ if m.value.Component.settings }}<span class="exec" data-exec="flow/settings" data-prevent="true" title="@(Settings)"><i class="ti ti-wrench"></i></span>{{ fi }}
 							{{ if !m.value.Component.meta || m.value.Component.meta.remove !== false }}
 							<span class="exec" data-exec="?/remove" data-prevent="true" title="@(Remove)"><i class="ti ti-trash red"></i></span>
@@ -48,6 +48,9 @@
 	PLUGIN('--PATH--', function(exports) {
 
 		exports.remove = function(el) {
+			// Engineer Mode off (see public/parts/flow.html)
+			if (common.readonly)
+				return;
 			var id = ATTRD(el);
 			EXEC('-approve/show', '@(Are you sure you want to remove selected node?)', '"ti ti-trash" @(Remove)', function() {
 				Designer.op.remove(id);
