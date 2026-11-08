@@ -54,8 +54,8 @@
 					{{ if value !== 'prod' }}<span class="badge badge-medium badge-{{ if value === 'dev' }}red{{ else if value === 'test' }}orange{{ else }}green{{ fi }}">{{ value }}</span>{{ fi }}
 				</script>
 			</ui-bind>
-
 			<span class="search exec pull-right" data-exec="common/search" title="@(Search) (F1)"><i class="ti ti-search"></i></span>
+			<span class="badge badge-large badge-info read-only-badge readonly-show pull-right">View Only</span>
 			@{if user.openplatform && !user.iframe}
 			<span class="mainmenu"><a href="@{user.openplatform}"><i class="ti ti-menu"></i></a></span>
 			@{else}
@@ -176,10 +176,31 @@
 			}
 		};
 
+		// Read-only unless the main app reports Engineer Mode on. Embedded in the main app
+		// it starts read-only until the first 'engineermode' message arrives; standalone
+		// (no parent to tell us) it stays editable.
+		common.readonly = W.parent !== W;
+		$('body').tclass('ui-readonly', common.readonly);
+
+		common.setreadonly = function(is) {
+			SET('common.readonly', is);
+			$('body').tclass('ui-readonly', is);
+			var win = $('.ui-parts-item');
+			for (var i = 0; i < win.length; i++) {
+				var w = $(win[i]).find('iframe')[0];
+				if (w)
+					w.contentWindow.postMessage(STRINGIFY({ TYPE: 'readonly', value: is }), '*');
+			}
+		};
+
 		W.addEventListener('message', function(e) {
 			var data = e.data;
-			if (data && data.source === 'webserver' && data.topic === 'theme')
-				common.darkmode(data.theme === 'dark');
+			if (data && data.source === 'webserver') {
+				if (data.topic === 'theme')
+					common.darkmode(data.theme === 'dark');
+				else if (data.topic === 'engineermode')
+					common.setreadonly(data.enabled !== true);
+			}
 		});
 
 		common.cl = {}; // for additional codelists
@@ -418,6 +439,8 @@
 			};
 
 			exports.dragdropcheck = function(e) {
+				if (common.readonly)
+					return false;
 				var model = exports.model;
 				var selected = model.tabs.findItem('focused', true);
 				return !selected || selected.id === 'main';
@@ -463,7 +486,7 @@
 				item.id = id;
 				item.icon = flow.icon;
 				item.name = flow.name;
-				item.html = ('<iframe src="' + common.designer + '?darkmode={1}&socket={2}&components={3}&language={4}" scrolling="no" frameborder="0" class="iflowstream" style="width:{5}px"></iframe>').format(id, $('body').hclass('ui-dark') ? '1' : '0', encodeURIComponent(url), encodeURIComponent(common.components || '') + common.openplatform ? ('&' + common.openplatform.substring(1)) : '', common.language, WW - model.appmenuwidth);
+				item.html = ('<iframe src="' + common.designer + '?darkmode={1}&readonly={6}&socket={2}&components={3}&language={4}" scrolling="no" frameborder="0" class="iflowstream" style="width:{5}px"></iframe>').format(id, $('body').hclass('ui-dark') ? '1' : '0', encodeURIComponent(url), encodeURIComponent(common.components || '') + common.openplatform ? ('&' + common.openplatform.substring(1)) : '', common.language, WW - model.appmenuwidth, common.readonly ? '1' : '0');
 				item.focus = 'common/focusiframe';
 				// no loading indicator here: the designer iframe shows its own while it boots
 				exports.push('tabs', item);
@@ -493,10 +516,10 @@
 
 				opt.items = [];
 
-				if (user.sa)
+				if (user.sa && !common.readonly)
 					opt.items.push({ id: 'variables', name: '@(Variables)', icon: 'ti ti-variables', classname: 'b' });
 
-				if (common.totalversion > 4045 && item.stats) {
+				if (!common.readonly && common.totalversion > 4045 && item.stats) {
 					if (item.stats.paused) {
 						opt.items.push({ id: 'play', name: '@(Play)', icon: 'ti ti-play green' });
 						paused = true;
@@ -510,19 +533,19 @@
 				if (top === W)
 					opt.items.push({ id: 'newtab', name: '@(Open in new tab)', icon: 'ti ti-window-alt' });
 
-				opt.items.push({ id: 'edit', name: '@(Edit)', icon: 'ti ti-pencil' });
+				!common.readonly && opt.items.push({ id: 'edit', name: '@(Edit)', icon: 'ti ti-pencil' });
 
-				if (user.sa || user.permissions.includes('create'))
+				if (!common.readonly && (user.sa || user.permissions.includes('create')))
 					opt.items.push({ id: 'clone', name: '@(Clone)', icon: 'ti ti-clone' });
 
 				// opt.items.push({ id: 'copy', name: '@(Copy to clipboard)', icon: 'ti ti-copy' });
 				opt.items.push({ id: 'copy2', name: '@(Copy as JSON)', icon: 'ti ti-copy' });
 				opt.items.push({ id: 'download', name: '@(Download)', icon: 'ti ti-download' });
 
-				if (common.workers)
+				if (common.workers && !common.readonly)
 					opt.items.push({ id: 'restart', name: '@(Restart)', icon: 'ti ti-sync' });
 
-				if (user.sa || user.permissions.includes('remove')) {
+				if (!common.readonly && (user.sa || user.permissions.includes('remove'))) {
 					opt.items.push('-');
 					opt.items.push({ id: 'remove', name: '@(Remove)', icon: 'ti ti-remove red' });
 				}
@@ -531,7 +554,7 @@
 					switch (opt.id) {
 						case 'newtab':
 							var url = location.origin.replace(/^http/, 'ws') + '@{#}/flows/{0}/'.format(id);
-							W.open(location.origin + common.designer + '?darkmode={0}&socket={1}&components={2}'.format($('body').hclass('ui-dark') ? '1' : '0', encodeURIComponent(url + (common.openplatform ? ((url.indexOf('?') === -1 ? '?' : '&') + common.openplatform.substring(1)) : '')), encodeURIComponent(common.components || '')) + (common.openplatform ? ('&' + common.openplatform.substring(1)) : ''));
+							W.open(location.origin + common.designer + '?darkmode={0}&readonly={3}&socket={1}&components={2}'.format($('body').hclass('ui-dark') ? '1' : '0', encodeURIComponent(url + (common.openplatform ? ((url.indexOf('?') === -1 ? '?' : '&') + common.openplatform.substring(1)) : '')), encodeURIComponent(common.components || ''), common.readonly ? '1' : '0') + (common.openplatform ? ('&' + common.openplatform.substring(1)) : ''));
 							break;
 						case 'pause':
 						case 'play':
@@ -592,7 +615,7 @@
 							});
 							break;
 						case 'remove':
-							(user.sa || user.permissions.includes('remove')) && EXEC('-approve/show', '@(Are you sure you want to remove selected FlowStream "{0}"?)'.format(item.name), '"ti ti-remove" @(Remove)', function() {
+							!common.readonly && (user.sa || user.permissions.includes('remove')) && EXEC('-approve/show', '@(Are you sure you want to remove selected FlowStream "{0}"?)'.format(item.name), '"ti ti-remove" @(Remove)', function() {
 								exports.tapi('streams_remove/{0} ERROR'.format(id), exports.refresh);
 							});
 							break;
@@ -633,7 +656,7 @@
 
 				items.push({ id: 'flows', name: '@(Flow)', icon: 'ti ti-home' });
 
-				if (user.sa || user.permissions.includes('create')) {
+				if (!common.readonly && (user.sa || user.permissions.includes('create'))) {
 					items.push({ id: 'create', name: '@(Create new)', icon: 'ti ti-plus-circle green' });
 					items.push({ id: 'import', name: '@(Import FlowStream)', icon: 'ti ti-download', hidden: true });
 				}
@@ -761,6 +784,8 @@
 			};
 
 			exports.create = function() {
+				if (common.readonly)
+					return;
 				SET('streamform @default', {});
 				SET('common.form', 'streamform');
 			};
@@ -871,7 +896,7 @@
 
 			ON('paste', function(text) {
 				var data;
-				if (!common.form && text.substring(0, 4) === 'flow') {
+				if (!common.form && !common.readonly && text.substring(0, 4) === 'flow') {
 					data = DECRYPT(text, common.secret, 'flow');
 					if (data) {
 						EXEC('-approve/show', '@(Are you sure you want to import a Flow from the clipboard?)', '@(Import)', function() {
@@ -899,6 +924,13 @@
 			}
 
 			exports.mainmenu();
+
+			WATCH('common.readonly', function() {
+				exports.mainmenu();
+				// The stream form only opens for editing, so drop it if engineer mode turns off
+				if (common.readonly && (common.form === 'streamform' || common.form === 'newform' || common.form === 'variablesform' || common.form === 'importform'))
+					SET('common.form', '');
+			});
 
 		});
 
